@@ -285,12 +285,55 @@ input, textarea, select { font-family: inherit; }
 
 .page-header {
   display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
   margin-bottom: 18px;
 }
 .page-title {
   font-size: 24px; font-weight: 600; letter-spacing: -0.025em; margin: 0;
 }
 .page-subtitle { font-size: 13px; color: var(--text-3); margin-top: 3px; }
+
+.reservation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reservation-filter-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: var(--shadow-sm);
+}
+
+.reservation-filter-option {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: all 120ms ease;
+}
+.reservation-filter-option:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.reservation-filter-option.active {
+  background: var(--text);
+  color: var(--bg-elev);
+  box-shadow: var(--shadow-sm);
+}
 
 .day-strip {
   display: flex; gap: 6px;
@@ -334,6 +377,20 @@ input, textarea, select { font-family: inherit; }
 .day-chip.empty .day-chip-dot { background: transparent; }
 
 .reservation-list { display: flex; flex-direction: column; gap: 8px; }
+
+.reservation-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 112px;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-3);
+  font-size: 13px;
+  box-shadow: var(--shadow-sm);
+}
 
 .reservation-card {
   background: var(--surface);
@@ -1271,6 +1328,49 @@ input, textarea, select { font-family: inherit; }
 }
 
 @media (max-width: 720px) {
+  .page {
+    padding: 18px 16px 48px;
+  }
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .reservation-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .reservation-filter-control {
+    align-items: stretch;
+    overflow-x: auto;
+  }
+  .reservation-filter-option {
+    flex: 1 0 auto;
+  }
+  .reservation-actions .btn {
+    justify-content: center;
+    width: 100%;
+  }
+  .reservation-summary {
+    grid-template-columns: 66px 1fr auto;
+    gap: 10px;
+    padding: 13px 14px;
+  }
+  .reservation-party {
+    grid-column: 2;
+  }
+  .reservation-summary .status-pill {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .reservation-chevron {
+    display: none;
+  }
+  .reservation-detail {
+    grid-template-columns: 1fr;
+  }
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
   .autonomy-options {
     grid-template-columns: 1fr;
   }

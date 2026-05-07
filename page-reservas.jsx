@@ -19,6 +19,29 @@ function StatusPill({ status }) {
 }
 window.StatusPill = StatusPill;
 
+const RESERVATION_FILTERS = [
+  {
+    id: "confirmadas",
+    label: "Reservas Confirmadas",
+    matches: (reservation) => reservation.status === "confirmada",
+  },
+  {
+    id: "andamento",
+    label: "Reservas em Andamento",
+    matches: (reservation) => reservation.status === "aguardando",
+  },
+  {
+    id: "canceladas",
+    label: "Reservas Canceladas",
+    matches: (reservation) => reservation.status === "cancelada",
+  },
+  {
+    id: "geral",
+    label: "Geral",
+    matches: () => true,
+  },
+];
+
 function ReservationCard({ reservation, isOpen, onToggle }) {
   const r = reservation;
   return (
@@ -114,6 +137,11 @@ function ReservationCard({ reservation, isOpen, onToggle }) {
 function ReservationsPage({ defaultOpenAll }) {
   const [openId, setOpenId] = useState(defaultOpenAll ? "*" : "r-002");
   const [activeDay, setActiveDay] = useState(6);
+  const [reservationFilter, setReservationFilter] = useState("confirmadas");
+
+  const selectedFilter = RESERVATION_FILTERS.find(filter => filter.id === reservationFilter) || RESERVATION_FILTERS[0];
+  const filteredReservations = window.MOCK_RESERVATIONS.filter(selectedFilter.matches);
+  const reservationCountLabel = filteredReservations.length === 1 ? "reserva" : "reservas";
 
   const isOpen = (id) => openId === "*" || openId === id;
 
@@ -123,10 +151,24 @@ function ReservationsPage({ defaultOpenAll }) {
         <div className="page-header">
           <div>
             <h1 className="page-title">Reservas</h1>
-            <div className="page-subtitle">Quinta-feira, 6 de novembro · 10 reservas</div>
+            <div className="page-subtitle">
+              Quinta-feira, 6 de novembro · {filteredReservations.length} {reservationCountLabel}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn"><Icon name="filter" size={13} />Filtrar</button>
+          <div className="reservation-actions">
+            <div className="reservation-filter-control" role="group" aria-label="Filtrar reservas">
+              {RESERVATION_FILTERS.map(filter => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  className={`reservation-filter-option ${reservationFilter === filter.id ? "active" : ""}`}
+                  aria-pressed={reservationFilter === filter.id}
+                  onClick={() => setReservationFilter(filter.id)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
             <button className="btn btn-primary"><Icon name="plus" size={13} />Nova reserva</button>
           </div>
         </div>
@@ -147,7 +189,7 @@ function ReservationsPage({ defaultOpenAll }) {
         </div>
 
         <div className="reservation-list">
-          {window.MOCK_RESERVATIONS.map(r => (
+          {filteredReservations.map(r => (
             <ReservationCard
               key={r.id}
               reservation={r}
@@ -155,6 +197,11 @@ function ReservationsPage({ defaultOpenAll }) {
               onToggle={() => setOpenId(isOpen(r.id) && openId !== "*" ? null : r.id)}
             />
           ))}
+          {!filteredReservations.length && (
+            <div className="reservation-empty">
+              Nenhuma reserva encontrada para este filtro.
+            </div>
+          )}
         </div>
       </div>
     </div>
