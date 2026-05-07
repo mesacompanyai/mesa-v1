@@ -1,7 +1,7 @@
 // Geral page — 4 sub-areas
 const { useEffect: useEffectGeral, useRef: useRefGeral, useState: useStateGeral } = React;
 
-function GeralAI() {
+function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
   const r = window.MOCK_RESTAURANT;
   const businessDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
   const [questions, setQuestions] = useStateGeral(() => window.MOCK_AI_QUESTIONS.map(q => ({ fixed: true, ...q })));
@@ -22,11 +22,6 @@ function GeralAI() {
   const [menuFiles, setMenuFiles] = useStateGeral([]);
   const [canSendMenuFiles, setCanSendMenuFiles] = useStateGeral(r.menuSettings?.canSendFiles ?? true);
   const [menuSendMode, setMenuSendMode] = useStateGeral(r.menuSettings?.sendMode || "on_request");
-  const [tables, setTables] = useStateGeral(() => window.MOCK_TABLES.map((table, i) => ({ ...table, uid: `table-${i + 1}` })));
-  const [tableModalMode, setTableModalMode] = useStateGeral(null);
-  const [tableDraft, setTableDraft] = useStateGeral({ uid: null, id: "", area: "", seats: "" });
-  const [tableDeleteTarget, setTableDeleteTarget] = useStateGeral(null);
-  const [openTableMenuId, setOpenTableMenuId] = useStateGeral(null);
   const [editingId, setEditingId] = useStateGeral(null);
   const [draftLabel, setDraftLabel] = useStateGeral("");
   const [draggingId, setDraggingId] = useStateGeral(null);
@@ -74,53 +69,6 @@ function GeralAI() {
     if (name.endsWith(".xls") || name.endsWith(".xlsx")) return "Excel";
     if (name.endsWith(".txt")) return "TXT";
     return "Arquivo";
-  };
-  const resetTableDraft = () => setTableDraft({ uid: null, id: "", area: "", seats: "" });
-  const openNewTableModal = () => {
-    setOpenTableMenuId(null);
-    resetTableDraft();
-    setTableModalMode("create");
-  };
-  const openEditTableModal = (table) => {
-    setOpenTableMenuId(null);
-    setTableDraft({ uid: table.uid, id: table.id, area: table.area, seats: String(table.seats) });
-    setTableModalMode("edit");
-  };
-  const closeTableModal = () => {
-    setTableModalMode(null);
-    resetTableDraft();
-  };
-  const updateTableDraft = (field, value) => {
-    setTableDraft(draft => ({ ...draft, [field]: value }));
-  };
-  const tableSeats = Number(tableDraft.seats);
-  const tableDraftValid = tableDraft.id.trim() && tableDraft.area.trim() && Number.isInteger(tableSeats) && tableSeats > 0;
-  const saveTable = (e) => {
-    e.preventDefault();
-    if (!tableDraftValid) return;
-
-    const nextTable = {
-      uid: tableDraft.uid || `table-${Date.now()}`,
-      id: tableDraft.id.trim(),
-      area: tableDraft.area.trim(),
-      seats: tableSeats,
-    };
-
-    if (tableModalMode === "edit") {
-      setTables(current => current.map(table => table.uid === nextTable.uid ? nextTable : table));
-    } else {
-      setTables(current => [...current, nextTable]);
-    }
-    closeTableModal();
-  };
-  const confirmDeleteTable = () => {
-    if (!tableDeleteTarget) return;
-    setTables(current => current.filter(table => table.uid !== tableDeleteTarget.uid));
-    setTableDeleteTarget(null);
-  };
-  const openDeleteTableModal = (table) => {
-    setOpenTableMenuId(null);
-    setTableDeleteTarget(table);
   };
   const startEdit = (q) => {
     if (q.fixed) return;
@@ -498,140 +446,13 @@ function GeralAI() {
         </div>
       </div>
 
-      <div className="section-card">
-        <div className="section-card-header">
-          <div>
-            <h2>Mesas cadastradas</h2>
-            <div className="section-card-subtitle">{tables.length} mesas cadastradas</div>
-          </div>
-          <button className="btn btn-primary" onClick={openNewTableModal}>
-            <Icon name="plus" size={13} />
-            Adicionar mesa
-          </button>
-        </div>
-        {tables.length ? (
-          <div className="tables-grid">
-            {tables.map(t => (
-              <div key={t.uid} className="table-card">
-                <div className="table-card-actions">
-                  <button
-                    className="table-card-action"
-                    onClick={() => setOpenTableMenuId(current => current === t.uid ? null : t.uid)}
-                    title="Opções da mesa"
-                    aria-label={`Opções de ${t.id}`}
-                  >
-                    <Icon name="more" size={15} />
-                  </button>
-                  {openTableMenuId === t.uid && (
-                    <div className="table-card-menu">
-                      <button type="button" onClick={() => openEditTableModal(t)}>
-                        <Icon name="edit" size={12} />
-                        Editar
-                      </button>
-                      <button type="button" className="danger" onClick={() => openDeleteTableModal(t)}>
-                        <Icon name="x" size={12} />
-                        Excluir
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="table-card-name">{t.id}</div>
-                <div className="table-card-area">{t.area}</div>
-                <div className="table-card-seats"><Icon name="person" size={11} />{t.seats}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="tables-empty">
-            <div>
-              <div className="tables-empty-title">Nenhuma mesa cadastrada</div>
-              <div className="tables-empty-sub">Adicione uma mesa para a IA considerar a capacidade do salão.</div>
-            </div>
-            <button className="btn btn-primary" onClick={openNewTableModal}>
-              <Icon name="plus" size={13} />
-              Adicionar mesa
-            </button>
-          </div>
-        )}
-      </div>
-
-      {tableModalMode && (
-        <div className="modal-backdrop" onMouseDown={closeTableModal}>
-          <form className="modal-card" onSubmit={saveTable} onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h3>{tableModalMode === "edit" ? "Editar mesa" : "Nova mesa"}</h3>
-                <div className="modal-subtitle">Dados usados para organizar reservas e capacidade.</div>
-              </div>
-              <button type="button" className="modal-close" onClick={closeTableModal} title="Fechar">
-                <Icon name="x" size={14} />
-              </button>
-            </div>
-            <div className="field">
-              <label className="field-label">Nome da mesa</label>
-              <input
-                className="field-input"
-                value={tableDraft.id}
-                onChange={(e) => updateTableDraft("id", e.target.value)}
-                placeholder="Mesa 15"
-                autoFocus
-              />
-            </div>
-            <div className="field">
-              <label className="field-label">Área</label>
-              <input
-                className="field-input"
-                value={tableDraft.area}
-                onChange={(e) => updateTableDraft("area", e.target.value)}
-                placeholder="Salão Principal"
-              />
-            </div>
-            <div className="field">
-              <label className="field-label">Lugares</label>
-              <input
-                className="field-input"
-                type="number"
-                min="1"
-                step="1"
-                value={tableDraft.seats}
-                onChange={(e) => updateTableDraft("seats", e.target.value)}
-                placeholder="4"
-              />
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={closeTableModal}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={!tableDraftValid}>
-                {tableModalMode === "edit" ? "Salvar" : "Criar mesa"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {tableDeleteTarget && (
-        <div className="modal-backdrop" onMouseDown={() => setTableDeleteTarget(null)}>
-          <div className="modal-card modal-card-sm" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h3>Excluir mesa</h3>
-                <div className="modal-subtitle">
-                  Remover {tableDeleteTarget.id} de {tableDeleteTarget.area}?
-                </div>
-              </div>
-              <button type="button" className="modal-close" onClick={() => setTableDeleteTarget(null)} title="Fechar">
-                <Icon name="x" size={14} />
-              </button>
-            </div>
-            <div className="delete-copy">
-              Esta ação remove a mesa da grade desta sessão. Reservas mockadas existentes não serão alteradas.
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setTableDeleteTarget(null)}>Cancelar</button>
-              <button type="button" className="btn btn-danger" onClick={confirmDeleteTable}>Excluir</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TablesManager
+        tables={tables}
+        onCreateTable={onCreateTable}
+        onUpdateTable={onUpdateTable}
+        onDeleteTable={onDeleteTable}
+        variant="section"
+      />
     </div>
   );
 }
@@ -805,7 +626,7 @@ function GeralConfig() {
   );
 }
 
-function GeralPage({ wppConnected, setWppConnected }) {
+function GeralPage({ wppConnected, setWppConnected, tables, onCreateTable, onUpdateTable, onDeleteTable }) {
   const [section, setSection] = useStateGeral("ai");
   const sections = [
     { id: "ai",       label: "Inteligência Artificial", icon: "ai" },
@@ -832,7 +653,14 @@ function GeralPage({ wppConnected, setWppConnected }) {
         </div>
       </aside>
       <div className="geral-content">
-        {section === "ai" && <GeralAI />}
+        {section === "ai" && (
+          <GeralAI
+            tables={tables}
+            onCreateTable={onCreateTable}
+            onUpdateTable={onUpdateTable}
+            onDeleteTable={onDeleteTable}
+          />
+        )}
         {section === "conn" && <GeralConexoes wppConnected={wppConnected} setWppConnected={setWppConnected} />}
         {section === "team" && <GeralEquipe />}
         {section === "settings" && <GeralConfig />}

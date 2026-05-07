@@ -1,6 +1,19 @@
 // Mesa — main app
 const { useState: useStateApp } = React;
 
+function normalizeTable(table, index) {
+  const legacyNumber = String(table.id || "").match(/\d+/)?.[0];
+  const number = Number(table.number ?? legacyNumber ?? index + 1);
+  const legacyLocation = String(table.area || "").toLowerCase().includes("externa") ? "outside" : "inside";
+
+  return {
+    uid: table.uid || `table-${index + 1}`,
+    number: Number.isInteger(number) && number > 0 ? number : index + 1,
+    location: table.location || legacyLocation,
+    seats: Number(table.seats) || 2,
+  };
+}
+
 function App() {
   const [t, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
     "theme": "light",
@@ -9,12 +22,28 @@ function App() {
 
   const [page, setPage] = useStateApp("reservas");
   const [wppConnected, setWppConnected] = useStateApp(true);
+  const [tables, setTables] = useStateApp(() => window.MOCK_TABLES.map(normalizeTable));
 
   React.useEffect(() => {
     document.documentElement.setAttribute("data-theme", t.theme || "light");
   }, [t.theme]);
 
   const showAlert = t.showWhatsappAlert && !wppConnected ? true : t.showWhatsappAlert;
+  const tableManagerProps = {
+    tables,
+    onCreateTable: (table) => {
+      setTables(current => [
+        ...current,
+        { uid: `table-${Date.now()}-${Math.random().toString(16).slice(2)}`, ...table },
+      ]);
+    },
+    onUpdateTable: (uid, nextTable) => {
+      setTables(current => current.map(table => table.uid === uid ? { ...table, ...nextTable } : table));
+    },
+    onDeleteTable: (uid) => {
+      setTables(current => current.filter(table => table.uid !== uid));
+    },
+  };
 
   const navItems = [
     { id: "reservas",  label: "Reservas",  icon: "calendar" },
@@ -70,9 +99,15 @@ function App() {
       )}
 
       <main className="work-area">
-        {page === "reservas"  && <ReservationsPage />}
+        {page === "reservas"  && <ReservationsPage {...tableManagerProps} />}
         {page === "conversas" && <ConversationsPage />}
-        {page === "geral"     && <GeralPage wppConnected={wppConnected} setWppConnected={setWppConnected} />}
+        {page === "geral"     && (
+          <GeralPage
+            wppConnected={wppConnected}
+            setWppConnected={setWppConnected}
+            {...tableManagerProps}
+          />
+        )}
       </main>
 
       <TweaksPanel title="Tweaks">

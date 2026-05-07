@@ -26,20 +26,20 @@ window.MOCK_RESTAURANT = {
 };
 
 window.MOCK_TABLES = [
-  { id: "Mesa 1", area: "Bar", seats: 2 },
-  { id: "Mesa 2", area: "Mezanino", seats: 2 },
-  { id: "Mesa 3", area: "Salão Principal", seats: 4 },
-  { id: "Mesa 4", area: "Salão Principal", seats: 2 },
-  { id: "Mesa 5", area: "Salão Principal", seats: 4 },
-  { id: "Mesa 6", area: "Mezanino", seats: 2 },
-  { id: "Mesa 7", area: "Salão Principal", seats: 4 },
-  { id: "Mesa 8", area: "Salão Principal", seats: 6 },
-  { id: "Mesa 9", area: "Salão Principal", seats: 4 },
-  { id: "Mesa 10", area: "Salão Principal", seats: 4 },
-  { id: "Mesa 11", area: "Área Externa", seats: 4 },
-  { id: "Mesa 12", area: "Área Externa", seats: 6 },
-  { id: "Mesa 13", area: "Área Externa", seats: 4 },
-  { id: "Mesa 14", area: "Salão Principal", seats: 8 },
+  { number: 1, location: "inside", seats: 2 },
+  { number: 2, location: "inside", seats: 2 },
+  { number: 3, location: "inside", seats: 4 },
+  { number: 4, location: "inside", seats: 2 },
+  { number: 5, location: "inside", seats: 4 },
+  { number: 6, location: "inside", seats: 2 },
+  { number: 7, location: "inside", seats: 4 },
+  { number: 8, location: "inside", seats: 6 },
+  { number: 9, location: "inside", seats: 4 },
+  { number: 10, location: "inside", seats: 4 },
+  { number: 11, location: "outside", seats: 4 },
+  { number: 12, location: "outside", seats: 6 },
+  { number: 13, location: "outside", seats: 4 },
+  { number: 14, location: "inside", seats: 8 },
 ];
 
 window.MOCK_AI_QUESTIONS = [

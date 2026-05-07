@@ -134,10 +134,11 @@ function ReservationCard({ reservation, isOpen, onToggle }) {
   );
 }
 
-function ReservationsPage() {
+function ReservationsPage({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
   const [openId, setOpenId] = useState(null);
   const [activeDay, setActiveDay] = useState(6);
   const [reservationFilter, setReservationFilter] = useState("confirmadas");
+  const [tablesModalOpen, setTablesModalOpen] = useState(false);
 
   const selectedFilter = RESERVATION_FILTERS.find(filter => filter.id === reservationFilter) || RESERVATION_FILTERS[0];
   const filteredReservations = window.MOCK_RESERVATIONS.filter(selectedFilter.matches);
@@ -169,6 +170,10 @@ function ReservationsPage() {
                 </button>
               ))}
             </div>
+            <button className="btn" onClick={() => setTablesModalOpen(true)}>
+              <Icon name="table" size={13} />
+              Mesas
+            </button>
             <button className="btn btn-primary"><Icon name="plus" size={13} />Nova reserva</button>
           </div>
         </div>
@@ -204,6 +209,21 @@ function ReservationsPage() {
           )}
         </div>
       </div>
+
+      {tablesModalOpen && (
+        <div className="modal-backdrop" onMouseDown={() => setTablesModalOpen(false)}>
+          <div className="modal-card tables-manager-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+            <TablesManager
+              tables={tables}
+              onCreateTable={onCreateTable}
+              onUpdateTable={onUpdateTable}
+              onDeleteTable={onDeleteTable}
+              variant="modal"
+              onClose={() => setTablesModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

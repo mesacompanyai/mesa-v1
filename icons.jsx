@@ -17,7 +17,7 @@ const Icon = ({ name, size = 16, stroke = 1.6, ...rest }) => {
     case "chevron":  return <svg {...common}><path d="m9 6 6 6-6 6"/></svg>;
     case "users":    return <svg {...common}><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17" cy="9" r="2.7"/><path d="M16 14c2.5 0 5.5 1.5 5.5 5"/></svg>;
     case "person":   return <svg {...common}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg>;
-    case "table":    return <svg {...common}><rect x="3.5" y="6" width="17" height="13" rx="2"/><path d="M3.5 11h17M9.5 6v13M14.5 6v13"/></svg>;
+    case "table":    return <svg {...common}><path d="M5 10h14"/><path d="M7 10l-2 9M17 10l2 9"/><path d="M8 16h8"/><path d="M8 7h8"/></svg>;
     case "location": return <svg {...common}><path d="M12 21s-7-6.5-7-12a7 7 0 1 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>;
     case "leaf":     return <svg {...common}><path d="M21 3c0 9-6 15-13 15-2 0-3.5-.5-3.5-.5S5 12 9 8s12-5 12-5z"/><path d="M4 20c4-7 9-11 14-13"/></svg>;
     case "milk":     return <svg {...common}><path d="M9 3h6v3l2 4v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-9l2-4z"/><path d="M7 13h10"/></svg>;
