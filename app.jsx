@@ -4,8 +4,7 @@ const { useState: useStateApp } = React;
 function App() {
   const [t, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
     "theme": "light",
-    "showWhatsappAlert": false,
-    "expandFirstCard": false
+    "showWhatsappAlert": false
   }/*EDITMODE-END*/);
 
   const [page, setPage] = useStateApp("reservas");
@@ -71,7 +70,7 @@ function App() {
       )}
 
       <main className="work-area">
-        {page === "reservas"  && <ReservationsPage defaultOpenAll={t.expandFirstCard} key={t.expandFirstCard ? "open" : "closed"} />}
+        {page === "reservas"  && <ReservationsPage />}
         {page === "conversas" && <ConversationsPage />}
         {page === "geral"     && <GeralPage wppConnected={wppConnected} setWppConnected={setWppConnected} />}
       </main>
@@ -93,11 +92,6 @@ function App() {
             label="Alerta WhatsApp"
             value={t.showWhatsappAlert}
             onChange={(v) => setTweak("showWhatsappAlert", v)}
-          />
-          <TweakToggle
-            label="Expandir cards"
-            value={t.expandFirstCard}
-            onChange={(v) => setTweak("expandFirstCard", v)}
           />
         </TweakSection>
       </TweaksPanel>

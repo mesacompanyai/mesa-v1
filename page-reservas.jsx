@@ -134,8 +134,8 @@ function ReservationCard({ reservation, isOpen, onToggle }) {
   );
 }
 
-function ReservationsPage({ defaultOpenAll }) {
-  const [openId, setOpenId] = useState(defaultOpenAll ? "*" : "r-002");
+function ReservationsPage() {
+  const [openId, setOpenId] = useState(null);
   const [activeDay, setActiveDay] = useState(6);
   const [reservationFilter, setReservationFilter] = useState("confirmadas");
 
@@ -143,7 +143,7 @@ function ReservationsPage({ defaultOpenAll }) {
   const filteredReservations = window.MOCK_RESERVATIONS.filter(selectedFilter.matches);
   const reservationCountLabel = filteredReservations.length === 1 ? "reserva" : "reservas";
 
-  const isOpen = (id) => openId === "*" || openId === id;
+  const isOpen = (id) => openId === id;
 
   return (
     <div className="page" data-screen-label="01 Reservas">
@@ -194,7 +194,7 @@ function ReservationsPage({ defaultOpenAll }) {
               key={r.id}
               reservation={r}
               isOpen={isOpen(r.id)}
-              onToggle={() => setOpenId(isOpen(r.id) && openId !== "*" ? null : r.id)}
+              onToggle={() => setOpenId(isOpen(r.id) ? null : r.id)}
             />
           ))}
           {!filteredReservations.length && (
