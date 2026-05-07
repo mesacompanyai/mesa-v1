@@ -14,6 +14,15 @@ function normalizeTable(table, index) {
   };
 }
 
+function normalizeTeamMember(member, index) {
+  return {
+    uid: member.uid || member.id || `team-${index + 1}`,
+    name: member.name || "",
+    phone: member.phone || "",
+    activeToday: member.activeToday ?? true,
+  };
+}
+
 function App() {
   const [t, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
     "theme": "light",
@@ -23,6 +32,7 @@ function App() {
   const [page, setPage] = useStateApp("reservas");
   const [wppConnected, setWppConnected] = useStateApp(true);
   const [tables, setTables] = useStateApp(() => window.MOCK_TABLES.map(normalizeTable));
+  const [team, setTeam] = useStateApp(() => window.MOCK_TEAM.map(normalizeTeamMember));
 
   React.useEffect(() => {
     document.documentElement.setAttribute("data-theme", t.theme || "light");
@@ -42,6 +52,21 @@ function App() {
     },
     onDeleteTable: (uid) => {
       setTables(current => current.filter(table => table.uid !== uid));
+    },
+  };
+  const teamManagerProps = {
+    team,
+    onCreateTeamMember: (member) => {
+      setTeam(current => [
+        ...current,
+        { uid: `team-${Date.now()}-${Math.random().toString(16).slice(2)}`, ...member },
+      ]);
+    },
+    onUpdateTeamMember: (uid, nextMember) => {
+      setTeam(current => current.map(member => member.uid === uid ? { ...member, ...nextMember } : member));
+    },
+    onDeleteTeamMember: (uid) => {
+      setTeam(current => current.filter(member => member.uid !== uid));
     },
   };
 
@@ -99,13 +124,14 @@ function App() {
       )}
 
       <main className="work-area">
-        {page === "reservas"  && <ReservationsPage {...tableManagerProps} />}
+        {page === "reservas"  && <ReservationsPage {...tableManagerProps} {...teamManagerProps} />}
         {page === "conversas" && <ConversationsPage />}
         {page === "geral"     && (
           <GeralPage
             wppConnected={wppConnected}
             setWppConnected={setWppConnected}
             {...tableManagerProps}
+            {...teamManagerProps}
           />
         )}
       </main>

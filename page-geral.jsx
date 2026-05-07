@@ -511,54 +511,16 @@ function GeralConexoes({ wppConnected, setWppConnected }) {
   );
 }
 
-function GeralEquipe() {
+function GeralEquipe({ team, onCreateTeamMember, onUpdateTeamMember, onDeleteTeamMember }) {
   return (
     <div className="geral-content-inner">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Equipe</h1>
-          <div className="page-subtitle">{window.MOCK_TEAM.length} funcionários ativos</div>
-        </div>
-        <button className="btn btn-primary"><Icon name="plus" size={13} />Adicionar</button>
-      </div>
-
-      <div className="section-card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="team-table">
-          <thead>
-            <tr>
-              <th>Funcionário</th>
-              <th>Cargo</th>
-              <th>WhatsApp</th>
-              <th>Mesas</th>
-              <th>Notificações</th>
-              <th>Antecedência</th>
-            </tr>
-          </thead>
-          <tbody>
-            {window.MOCK_TEAM.map(t => (
-              <tr key={t.id}>
-                <td>
-                  <div className="team-name">
-                    <div className="team-avatar">{t.initials}</div>
-                    {t.name}
-                  </div>
-                </td>
-                <td style={{ color: "var(--text-2)" }}>{t.role}</td>
-                <td style={{ color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>{t.phone}</td>
-                <td style={{ color: "var(--text-2)" }}>{t.tables}</td>
-                <td>
-                  <div className="team-tags">
-                    {t.notifications.map(n => (
-                      <span className="tag" key={n} style={{ fontSize: 10.5, padding: "2px 7px" }}>{n}</span>
-                    ))}
-                  </div>
-                </td>
-                <td style={{ color: "var(--text-2)" }}>{t.advance}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TeamManager
+        team={team}
+        onCreateTeamMember={onCreateTeamMember}
+        onUpdateTeamMember={onUpdateTeamMember}
+        onDeleteTeamMember={onDeleteTeamMember}
+        variant="section"
+      />
     </div>
   );
 }
@@ -626,12 +588,23 @@ function GeralConfig() {
   );
 }
 
-function GeralPage({ wppConnected, setWppConnected, tables, onCreateTable, onUpdateTable, onDeleteTable }) {
+function GeralPage({
+  wppConnected,
+  setWppConnected,
+  tables,
+  onCreateTable,
+  onUpdateTable,
+  onDeleteTable,
+  team,
+  onCreateTeamMember,
+  onUpdateTeamMember,
+  onDeleteTeamMember,
+}) {
   const [section, setSection] = useStateGeral("ai");
   const sections = [
     { id: "ai",       label: "Inteligência Artificial", icon: "ai" },
     { id: "conn",     label: "Conexões",                icon: "link" },
-    { id: "team",     label: "Equipe",                  icon: "users" },
+    { id: "team",     label: "Equipe",                  icon: "team" },
     { id: "settings", label: "Configurações",           icon: "gear" },
   ];
 
@@ -662,7 +635,14 @@ function GeralPage({ wppConnected, setWppConnected, tables, onCreateTable, onUpd
           />
         )}
         {section === "conn" && <GeralConexoes wppConnected={wppConnected} setWppConnected={setWppConnected} />}
-        {section === "team" && <GeralEquipe />}
+        {section === "team" && (
+          <GeralEquipe
+            team={team}
+            onCreateTeamMember={onCreateTeamMember}
+            onUpdateTeamMember={onUpdateTeamMember}
+            onDeleteTeamMember={onDeleteTeamMember}
+          />
+        )}
         {section === "settings" && <GeralConfig />}
       </div>
     </div>

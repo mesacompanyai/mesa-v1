@@ -134,11 +134,21 @@ function ReservationCard({ reservation, isOpen, onToggle }) {
   );
 }
 
-function ReservationsPage({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
+function ReservationsPage({
+  tables,
+  onCreateTable,
+  onUpdateTable,
+  onDeleteTable,
+  team,
+  onCreateTeamMember,
+  onUpdateTeamMember,
+  onDeleteTeamMember,
+}) {
   const [openId, setOpenId] = useState(null);
   const [activeDay, setActiveDay] = useState(6);
   const [reservationFilter, setReservationFilter] = useState("confirmadas");
   const [tablesModalOpen, setTablesModalOpen] = useState(false);
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
 
   const selectedFilter = RESERVATION_FILTERS.find(filter => filter.id === reservationFilter) || RESERVATION_FILTERS[0];
   const filteredReservations = window.MOCK_RESERVATIONS.filter(selectedFilter.matches);
@@ -173,6 +183,10 @@ function ReservationsPage({ tables, onCreateTable, onUpdateTable, onDeleteTable 
             <button className="btn" onClick={() => setTablesModalOpen(true)}>
               <Icon name="table" size={13} />
               Mesas
+            </button>
+            <button className="btn" onClick={() => setTeamModalOpen(true)}>
+              <Icon name="team" size={13} />
+              Equipe
             </button>
             <button className="btn btn-primary"><Icon name="plus" size={13} />Nova reserva</button>
           </div>
@@ -220,6 +234,21 @@ function ReservationsPage({ tables, onCreateTable, onUpdateTable, onDeleteTable 
               onDeleteTable={onDeleteTable}
               variant="modal"
               onClose={() => setTablesModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {teamModalOpen && (
+        <div className="modal-backdrop" onMouseDown={() => setTeamModalOpen(false)}>
+          <div className="modal-card team-manager-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+            <TeamManager
+              team={team}
+              onCreateTeamMember={onCreateTeamMember}
+              onUpdateTeamMember={onUpdateTeamMember}
+              onDeleteTeamMember={onDeleteTeamMember}
+              variant="modal"
+              onClose={() => setTeamModalOpen(false)}
             />
           </div>
         </div>
