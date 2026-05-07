@@ -1,0 +1,109 @@
+// Mesa — main app
+const { useState: useStateApp } = React;
+
+function App() {
+  const [t, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
+    "theme": "light",
+    "showWhatsappAlert": false,
+    "expandFirstCard": false
+  }/*EDITMODE-END*/);
+
+  const [page, setPage] = useStateApp("reservas");
+  const [wppConnected, setWppConnected] = useStateApp(true);
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute("data-theme", t.theme || "light");
+  }, [t.theme]);
+
+  const showAlert = t.showWhatsappAlert && !wppConnected ? true : t.showWhatsappAlert;
+
+  const navItems = [
+    { id: "reservas",  label: "Reservas",  icon: "calendar" },
+    { id: "conversas", label: "Conversas", icon: "chat" },
+    { id: "geral",     label: "Geral",     icon: "gear" },
+  ];
+
+  return (
+    <div className="mesa-app">
+      <header className="topbar">
+        <div className="topbar-left">
+          <div className="topbar-brand">
+            <div className="topbar-brand-mark">M</div>
+            <span>Mesa</span>
+            <span style={{ color: "var(--text-3)", fontWeight: 400, marginLeft: 4 }}>·</span>
+            <span style={{ color: "var(--text-3)", fontWeight: 400 }}>Casa Aurora</span>
+          </div>
+          <nav className="topbar-nav">
+            {navItems.map(n => (
+              <button
+                key={n.id}
+                className={page === n.id ? "active" : ""}
+                onClick={() => setPage(n.id)}
+              >
+                <Icon name={n.icon} size={13} />
+                {n.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="topbar-right">
+          <div className="topbar-search">
+            <Icon name="search" size={13} />
+            <input placeholder="Buscar reservas, clientes…" />
+            <span style={{ fontSize: 10.5, color: "var(--text-4)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px" }}>⌘K</span>
+          </div>
+          <button className="icon-btn" title="Notificações"><Icon name="bell" size={15} /></button>
+          <button className="avatar-btn">MB</button>
+        </div>
+      </header>
+
+      {showAlert && (
+        <div className="global-alert" data-comment-anchor="wpp-alert">
+          <span className="global-alert-dot" />
+          <div className="global-alert-text">
+            <strong>WhatsApp desconectado.</strong>{" "}
+            <span style={{ color: "var(--text-2)" }}>Reconecte para retomar o atendimento automático.</span>
+          </div>
+          <button className="global-alert-action" onClick={() => { setWppConnected(true); setTweak("showWhatsappAlert", false); }}>
+            Reconectar
+          </button>
+        </div>
+      )}
+
+      <main className="work-area">
+        {page === "reservas"  && <ReservationsPage defaultOpenAll={t.expandFirstCard} key={t.expandFirstCard ? "open" : "closed"} />}
+        {page === "conversas" && <ConversationsPage />}
+        {page === "geral"     && <GeralPage wppConnected={wppConnected} setWppConnected={setWppConnected} />}
+      </main>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Aparência">
+          <TweakRadio
+            label="Tema"
+            value={t.theme}
+            onChange={(v) => setTweak("theme", v)}
+            options={[
+              { value: "light", label: "Claro" },
+              { value: "dark",  label: "Escuro" },
+            ]}
+          />
+        </TweakSection>
+        <TweakSection label="Demonstração">
+          <TweakToggle
+            label="Alerta WhatsApp"
+            value={t.showWhatsappAlert}
+            onChange={(v) => setTweak("showWhatsappAlert", v)}
+          />
+          <TweakToggle
+            label="Expandir cards"
+            value={t.expandFirstCard}
+            onChange={(v) => setTweak("expandFirstCard", v)}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
