@@ -1,6 +1,17 @@
 // Mesa — main app
 const { useState: useStateApp } = React;
 
+const DEFAULT_CONVERSATION_RETENTION = {
+  preset: "30d",
+  customDays: 30,
+};
+
+const CONVERSATION_RETENTION_DAYS = {
+  "24h": 1,
+  "7d": 7,
+  "30d": 30,
+};
+
 function normalizeTable(table, index) {
   const legacyNumber = String(table.id || "").match(/\d+/)?.[0];
   const number = Number(table.number ?? legacyNumber ?? index + 1);
@@ -23,6 +34,49 @@ function normalizeTeamMember(member, index) {
   };
 }
 
+function cloneMessagesByConversation(messagesByConversation = {}) {
+  return Object.fromEntries(
+    Object.entries(messagesByConversation).map(([conversationId, messages]) => [
+      conversationId,
+      Array.isArray(messages) ? messages.map(message => ({ ...message })) : [],
+    ])
+  );
+}
+
+function getConversationRetentionDays(retention) {
+  if (retention?.preset === "custom") {
+    return Math.max(1, Math.floor(Number(retention.customDays) || DEFAULT_CONVERSATION_RETENTION.customDays));
+  }
+
+  return CONVERSATION_RETENTION_DAYS[retention?.preset] || CONVERSATION_RETENTION_DAYS[DEFAULT_CONVERSATION_RETENTION.preset];
+}
+
+function getConversationUpdatedAtMs(conversation) {
+  const timestamp = Date.parse(conversation?.updatedAt || conversation?.lastActivityAt || "");
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getConversationReferenceTime(conversations) {
+  const timestamps = conversations
+    .map(getConversationUpdatedAtMs)
+    .filter(timestamp => timestamp != null);
+
+  if (!timestamps.length) return Date.now();
+  return Math.max(Date.now(), ...timestamps);
+}
+
+function getExpiredConversationIds(conversations, retention) {
+  const days = getConversationRetentionDays(retention);
+  const cutoff = getConversationReferenceTime(conversations) - days * 24 * 60 * 60 * 1000;
+
+  return conversations
+    .filter(conversation => {
+      const updatedAt = getConversationUpdatedAtMs(conversation);
+      return updatedAt != null && updatedAt < cutoff;
+    })
+    .map(conversation => conversation.id);
+}
+
 function App() {
   const [t, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
     "theme": "light",
@@ -33,10 +87,34 @@ function App() {
   const [wppConnected, setWppConnected] = useStateApp(true);
   const [tables, setTables] = useStateApp(() => window.MOCK_TABLES.map(normalizeTable));
   const [team, setTeam] = useStateApp(() => window.MOCK_TEAM.map(normalizeTeamMember));
+  const [conversations, setConversations] = useStateApp(() => window.MOCK_CONVERSATIONS.map(conversation => ({
+    ...conversation,
+    summary: conversation.summary ? { ...conversation.summary } : conversation.summary,
+  })));
+  const [messagesByConversation, setMessagesByConversation] = useStateApp(() => cloneMessagesByConversation(window.MOCK_MESSAGES));
+  const [conversationRetention, setConversationRetention] = useStateApp(DEFAULT_CONVERSATION_RETENTION);
+
+  const deleteConversationsByIds = (ids) => {
+    const idsToDelete = new Set(ids);
+    if (!idsToDelete.size) return;
+
+    setConversations(current => current.filter(conversation => !idsToDelete.has(conversation.id)));
+    setMessagesByConversation(current => {
+      const nextMessages = { ...current };
+      idsToDelete.forEach(id => {
+        delete nextMessages[id];
+      });
+      return nextMessages;
+    });
+  };
 
   React.useEffect(() => {
     document.documentElement.setAttribute("data-theme", t.theme || "light");
   }, [t.theme]);
+
+  React.useEffect(() => {
+    deleteConversationsByIds(getExpiredConversationIds(conversations, conversationRetention));
+  }, [conversations, conversationRetention]);
 
   const showAlert = t.showWhatsappAlert && !wppConnected ? true : t.showWhatsappAlert;
   const tableManagerProps = {
@@ -125,11 +203,20 @@ function App() {
 
       <main className="work-area">
         {page === "reservas"  && <ReservationsPage {...tableManagerProps} {...teamManagerProps} />}
-        {page === "conversas" && <ConversationsPage />}
+        {page === "conversas" && (
+          <ConversationsPage
+            conversations={conversations}
+            messagesByConversation={messagesByConversation}
+          />
+        )}
         {page === "geral"     && (
           <GeralPage
             wppConnected={wppConnected}
             setWppConnected={setWppConnected}
+            conversationCount={conversations.length}
+            conversationRetention={conversationRetention}
+            onRetentionChange={setConversationRetention}
+            onDeleteAllConversations={() => deleteConversationsByIds(conversations.map(conversation => conversation.id))}
             {...tableManagerProps}
             {...teamManagerProps}
           />

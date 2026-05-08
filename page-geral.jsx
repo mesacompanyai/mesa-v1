@@ -525,66 +525,176 @@ function GeralEquipe({ team, onCreateTeamMember, onUpdateTeamMember, onDeleteTea
   );
 }
 
-function GeralConfig() {
+const GERAL_RETENTION_OPTIONS = [
+  { preset: "24h", label: "24h" },
+  { preset: "7d", label: "7 dias" },
+  { preset: "30d", label: "1 mês" },
+  { preset: "custom", label: "Personalizado" },
+];
+
+function GeralConfig({
+  conversationCount = 0,
+  conversationRetention = { preset: "30d", customDays: 30 },
+  onRetentionChange = () => {},
+  onDeleteAllConversations = () => {},
+}) {
   const r = window.MOCK_RESTAURANT;
+  const [deleteModalOpen, setDeleteModalOpen] = useStateGeral(false);
+  const retentionPreset = conversationRetention.preset || "30d";
+  const customDays = Math.max(1, Math.floor(Number(conversationRetention.customDays) || 30));
+  const conversationCountLabel = conversationCount === 1 ? "conversa armazenada" : "conversas armazenadas";
+
+  const updateRetentionPreset = (preset) => {
+    onRetentionChange({ preset, customDays });
+  };
+
+  const updateCustomDays = (value) => {
+    onRetentionChange({
+      preset: "custom",
+      customDays: Math.max(1, Math.floor(Number(value) || 1)),
+    });
+  };
+
+  const confirmDeleteAllConversations = () => {
+    onDeleteAllConversations();
+    setDeleteModalOpen(false);
+  };
+
   return (
-    <div className="geral-content-inner">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Configurações</h1>
-          <div className="page-subtitle">Preferências gerais do sistema</div>
+    <>
+      <div className="geral-content-inner">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Configurações</h1>
+            <div className="page-subtitle">Preferências gerais do sistema</div>
+          </div>
+        </div>
+
+        <div className="section-card">
+          <h2>Informações do restaurante</h2>
+          <div className="field">
+            <label className="field-label">Nome</label>
+            <input className="field-input" defaultValue={r.name} />
+          </div>
+          <div className="field">
+            <label className="field-label">Estilo</label>
+            <input className="field-input" defaultValue={r.style} />
+          </div>
+        </div>
+
+        <div className="section-card">
+          <h2>Operação</h2>
+          <div className="row-flex">
+            <div className="row-flex-main">
+              <div className="row-flex-title">Modo piloto</div>
+              <div className="row-flex-sub">A IA não confirma reservas automaticamente sem revisão humana</div>
+            </div>
+            <label className="toggle"><input type="checkbox" defaultChecked={r.pilotMode} /><span className="toggle-slider"/></label>
+          </div>
+          <div className="row-flex">
+            <div className="row-flex-main">
+              <div className="row-flex-title">Relatório diário</div>
+              <div className="row-flex-sub">Resumo das reservas enviado ao gerente todo dia às 23h59</div>
+            </div>
+            <label className="toggle"><input type="checkbox" defaultChecked={r.dailyReport} /><span className="toggle-slider"/></label>
+          </div>
+        </div>
+
+        <div className="section-card danger-zone">
+          <h2>Ações sensíveis</h2>
+          <div className="section-card-subtitle">Operações irreversíveis. Use com cautela.</div>
+
+          <div className="conversation-retention-panel">
+            <div className="row-flex-main">
+              <div className="row-flex-title">Apagar conversas automaticamente</div>
+              <div className="row-flex-sub">
+                Remove apenas chats e mensagens após o período escolhido. Clientes, perfis, características e histórico de reservas NUNCA são apagados por esta regra.
+              </div>
+            </div>
+            <div className="conversation-retention-options" role="group" aria-label="Retenção de conversas">
+              {GERAL_RETENTION_OPTIONS.map(option => (
+                <button
+                  key={option.preset}
+                  type="button"
+                  className={`retention-option ${retentionPreset === option.preset ? "active" : ""}`}
+                  aria-pressed={retentionPreset === option.preset}
+                  onClick={() => updateRetentionPreset(option.preset)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {retentionPreset === "custom" && (
+              <label className="retention-custom-field">
+                <span>Dias</span>
+                <input
+                  className="field-input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={customDays}
+                  onChange={(e) => updateCustomDays(e.target.value)}
+                />
+              </label>
+            )}
+            <div className="retention-current-count">
+              {conversationCount} {conversationCountLabel}
+            </div>
+          </div>
+
+          <div className="row-flex">
+            <div className="row-flex-main">
+              <div className="row-flex-title">Apagar todas as conversas</div>
+              <div className="row-flex-sub">Remove definitivamente todos os chats e mensagens. Clientes, perfis e reservas NUNCA são apagados.</div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={!conversationCount}
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              Apagar
+            </button>
+          </div>
+          <div className="row-flex">
+            <div className="row-flex-main">
+              <div className="row-flex-title">Excluir conta do restaurante</div>
+              <div className="row-flex-sub">Encerra a assinatura e remove todos os dados</div>
+            </div>
+            <button type="button" className="btn">Excluir</button>
+          </div>
         </div>
       </div>
 
-      <div className="section-card">
-        <h2>Informações do restaurante</h2>
-        <div className="field">
-          <label className="field-label">Nome</label>
-          <input className="field-input" defaultValue={r.name} />
-        </div>
-        <div className="field">
-          <label className="field-label">Estilo</label>
-          <input className="field-input" defaultValue={r.style} />
-        </div>
-      </div>
-
-      <div className="section-card">
-        <h2>Operação</h2>
-        <div className="row-flex">
-          <div className="row-flex-main">
-            <div className="row-flex-title">Modo piloto</div>
-            <div className="row-flex-sub">A IA não confirma reservas automaticamente sem revisão humana</div>
+      {deleteModalOpen && (
+        <div className="modal-backdrop" onMouseDown={() => setDeleteModalOpen(false)}>
+          <div
+            className="modal-card modal-card-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-conversations-title"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <h3 id="delete-conversations-title">Apagar todas as conversas?</h3>
+                <div className="modal-subtitle">Esta ação não pode ser desfeita.</div>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setDeleteModalOpen(false)} title="Fechar">
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+            <div className="delete-copy">
+              Serão apagados apenas os chats e mensagens. Clientes, perfis com características e histórico de reservas NUNCA serão removidos por esta ação.
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setDeleteModalOpen(false)}>Cancelar</button>
+              <button type="button" className="btn btn-danger" onClick={confirmDeleteAllConversations}>Apagar conversas</button>
+            </div>
           </div>
-          <label className="toggle"><input type="checkbox" defaultChecked={r.pilotMode} /><span className="toggle-slider"/></label>
         </div>
-        <div className="row-flex">
-          <div className="row-flex-main">
-            <div className="row-flex-title">Relatório diário</div>
-            <div className="row-flex-sub">Resumo das reservas enviado ao gerente todo dia às 23h59</div>
-          </div>
-          <label className="toggle"><input type="checkbox" defaultChecked={r.dailyReport} /><span className="toggle-slider"/></label>
-        </div>
-      </div>
-
-      <div className="section-card danger-zone">
-        <h2>Ações sensíveis</h2>
-        <div className="section-card-subtitle">Operações irreversíveis. Use com cautela.</div>
-        <div className="row-flex">
-          <div className="row-flex-main">
-            <div className="row-flex-title">Apagar todas as conversas arquivadas</div>
-            <div className="row-flex-sub">Remove definitivamente conversas com mais de 90 dias</div>
-          </div>
-          <button className="btn">Apagar</button>
-        </div>
-        <div className="row-flex">
-          <div className="row-flex-main">
-            <div className="row-flex-title">Excluir conta do restaurante</div>
-            <div className="row-flex-sub">Encerra a assinatura e remove todos os dados</div>
-          </div>
-          <button className="btn">Excluir</button>
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
@@ -599,6 +709,10 @@ function GeralPage({
   onCreateTeamMember,
   onUpdateTeamMember,
   onDeleteTeamMember,
+  conversationCount,
+  conversationRetention,
+  onRetentionChange,
+  onDeleteAllConversations,
 }) {
   const [section, setSection] = useStateGeral("ai");
   const sections = [
@@ -643,7 +757,14 @@ function GeralPage({
             onDeleteTeamMember={onDeleteTeamMember}
           />
         )}
-        {section === "settings" && <GeralConfig />}
+        {section === "settings" && (
+          <GeralConfig
+            conversationCount={conversationCount}
+            conversationRetention={conversationRetention}
+            onRetentionChange={onRetentionChange}
+            onDeleteAllConversations={onDeleteAllConversations}
+          />
+        )}
       </div>
     </div>
   );

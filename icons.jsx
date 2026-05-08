@@ -43,6 +43,7 @@ const Icon = ({ name, size = 16, stroke = 1.6, ...rest }) => {
     case "clock":    return <svg {...common}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>;
     case "pin":      return <svg {...common}><path d="M12 2v6l4 4-4 1-4-1 4-4z"/><path d="M12 13v9"/></svg>;
     case "phone":    return <svg {...common}><path d="M5 4h4l2 5-2 1a11 11 0 0 0 5 5l1-2 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>;
+    case "note":     return <svg {...common}><path d="M5 4.5h10l4 4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2z"/><path d="M15 4.5V9h4M7 13h10M7 17h6"/></svg>;
     default: return null;
   }
 };
