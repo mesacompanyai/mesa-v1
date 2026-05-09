@@ -1,0 +1,499 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  owner
+  admin
+  manager
+  staff
+}
+
+enum WhatsappStatus {
+  pending_qr
+  connecting
+  open
+  close
+  disconnected
+  deleted
+}
+
+enum ConversationStatus {
+  active
+  waiting
+  confirmed
+  cancelled
+  requires_human_review
+  archived
+}
+
+enum SenderRole {
+  customer
+  ai
+  team
+  system
+}
+
+enum MessageStatus {
+  received
+  queued
+  sent
+  delivered
+  read
+  failed
+}
+
+enum EventStatus {
+  received
+  queued
+  processed
+  ignored
+  failed
+}
+
+enum MediaType {
+  image
+  audio
+  video
+  document
+  sticker
+  unknown
+}
+
+enum ProcessingStatus {
+  pending
+  processing
+  completed
+  failed
+  skipped
+}
+
+enum ReservationStatus {
+  draft
+  waiting
+  confirmed
+  seated
+  completed
+  cancelled
+}
+
+enum AiDraftStatus {
+  drafted
+  approved
+  rejected
+  sent
+  expired
+}
+
+enum HumanReviewStatus {
+  open
+  resolved
+  dismissed
+}
+
+model Tenant {
+  id                    String             @id @default(cuid())
+  name                  String
+  slug                  String             @unique
+  retentionDays         Int                @default(30)
+  pilotMode             Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  users                 User[]
+  restaurants           Restaurant[]
+  whatsappInstances     WhatsappInstance[]
+  customers             Customer[]
+  conversations         Conversation[]
+  messages              Message[]
+  messageEvents         MessageEvent[]
+  mediaAssets           MediaAsset[]
+  mediaProcessingJobs   MediaProcessingJob[]
+  transcripts           Transcript[]
+  reservations          Reservation[]
+  diningTables          DiningTable[]
+  teamMembers           TeamMember[]
+  memories              Memory[]
+  reservationFacts      ReservationFact[]
+  aiDrafts              AiDraft[]
+  humanReviews          HumanReview[]
+}
+
+model User {
+  id         String   @id @default(cuid())
+  tenantId   String
+  externalId String?  @unique
+  email      String
+  name       String?
+  role       UserRole @default(staff)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model Restaurant {
+  id                String             @id @default(cuid())
+  tenantId          String
+  name              String
+  style             String?
+  description       String?
+  timezone          String             @default("America/Sao_Paulo")
+  businessHours     Json?
+  aiGuide           Json?
+  settings          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  whatsappInstances WhatsappInstance[]
+  reservations      Reservation[]
+  diningTables      DiningTable[]
+  teamMembers       TeamMember[]
+
+  @@index([tenantId])
+}
+
+model WhatsappInstance {
+  id                  String          @id @default(cuid())
+  tenantId            String
+  restaurantId        String?
+  instanceName        String          @unique
+  instanceId          String?
+  instanceHash        String?
+  phoneNumber         String?
+  status              WhatsappStatus  @default(pending_qr)
+  profileName         String?
+  profilePicUrl       String?
+  qrCode              String?
+  qrBase64            String?
+  lastConnectedAt     DateTime?
+  lastDisconnectedAt  DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  tenant              Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  restaurant          Restaurant?     @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  conversations       Conversation[]
+  messageEvents       MessageEvent[]
+
+  @@index([tenantId])
+  @@index([restaurantId])
+}
+
+model Customer {
+  id                 String         @id @default(cuid())
+  tenantId           String
+  name               String?
+  initials           String?
+  phoneE164          String
+  notes              String?
+  preferences        Json?
+  lastContactAt      DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations      Conversation[]
+  reservations       Reservation[]
+  memories           Memory[]
+  reservationFacts   ReservationFact[]
+
+  @@unique([tenantId, phoneE164])
+  @@index([tenantId])
+}
+
+model Conversation {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  whatsappInstanceId String
+  customerId         String?
+  remoteJid          String
+  title              String?
+  status             ConversationStatus  @default(active)
+  unreadCount        Int                 @default(0)
+  lastMessagePreview String?
+  lastMessageAt      DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  whatsappInstance   WhatsappInstance    @relation(fields: [whatsappInstanceId], references: [id], onDelete: Cascade)
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  messages           Message[]
+  mediaAssets        MediaAsset[]
+  reservations       Reservation[]
+  memories           Memory[]
+  reservationFacts   ReservationFact[]
+  aiDrafts           AiDraft[]
+  humanReviews       HumanReview[]
+
+  @@unique([tenantId, whatsappInstanceId, remoteJid])
+  @@index([tenantId, status])
+  @@index([customerId])
+}
+
+model Message {
+  id                String        @id @default(cuid())
+  tenantId          String
+  conversationId    String
+  externalMessageId String?
+  senderRole        SenderRole
+  fromMe            Boolean       @default(false)
+  messageType       String
+  text              String?
+  timestamp         DateTime
+  raw               Json?
+  status            MessageStatus @default(received)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation      Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  mediaAssets       MediaAsset[]
+  aiDrafts          AiDraft[]
+  humanReviews      HumanReview[]
+
+  @@unique([tenantId, conversationId, externalMessageId])
+  @@index([tenantId, timestamp])
+  @@index([conversationId])
+}
+
+model MessageEvent {
+  id                  String             @id @default(cuid())
+  tenantId            String?
+  whatsappInstanceId  String?
+  instanceName        String
+  event               String
+  externalMessageId   String?
+  idempotencyKey      String             @unique
+  payload             Json
+  status              EventStatus        @default(received)
+  errorMessage        String?
+  processedAt         DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  tenant              Tenant?            @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  whatsappInstance    WhatsappInstance?  @relation(fields: [whatsappInstanceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([instanceName, event])
+  @@index([status])
+}
+
+model MediaAsset {
+  id                   String                @id @default(cuid())
+  tenantId             String
+  conversationId        String?
+  messageId             String?
+  bucket                String
+  storageKey            String                @unique
+  originalFileName      String?
+  mimeType              String?
+  mediaType             MediaType             @default(unknown)
+  sizeBytes             BigInt?
+  checksumSha256        String?
+  sourceUrl             String?
+  thumbnailStorageKey   String?
+  processingStatus      ProcessingStatus      @default(pending)
+  processingError       String?
+  raw                   Json?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation           Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message                Message?              @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  processingJobs         MediaProcessingJob[]
+  transcript             Transcript?
+
+  @@index([tenantId, mediaType])
+  @@index([conversationId])
+  @@index([messageId])
+}
+
+model MediaProcessingJob {
+  id             String           @id @default(cuid())
+  tenantId       String
+  mediaAssetId   String
+  queueJobId     String?
+  kind           String
+  status         ProcessingStatus @default(pending)
+  attempts       Int              @default(0)
+  errorMessage   String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mediaAsset     MediaAsset       @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([mediaAssetId])
+}
+
+model Transcript {
+  id             String      @id @default(cuid())
+  tenantId       String
+  mediaAssetId   String      @unique
+  text           String
+  language       String?
+  model          String?
+  confidence     Float?
+  segments       Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mediaAsset     MediaAsset  @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model Reservation {
+  id              String            @id @default(cuid())
+  tenantId        String
+  restaurantId    String?
+  customerId      String?
+  conversationId  String?
+  status          ReservationStatus @default(draft)
+  startsAt        DateTime
+  partySize       Int
+  tableLabel      String?
+  area            String?
+  notes           String?
+  source          String            @default("whatsapp")
+  raw             Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  restaurant      Restaurant?       @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  customer        Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  conversation    Conversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  reservationFacts ReservationFact[]
+
+  @@index([tenantId, startsAt])
+  @@index([customerId])
+  @@index([conversationId])
+}
+
+model DiningTable {
+  id            String      @id @default(cuid())
+  tenantId      String
+  restaurantId  String?
+  number        Int
+  label         String?
+  location      String?
+  seats         Int
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, restaurantId, number])
+  @@index([tenantId])
+}
+
+model TeamMember {
+  id            String      @id @default(cuid())
+  tenantId      String
+  restaurantId  String?
+  name          String
+  phoneE164     String?
+  activeToday   Boolean     @default(true)
+  notificationSettings Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+}
+
+model Memory {
+  id              String        @id @default(cuid())
+  tenantId        String
+  customerId      String?
+  conversationId  String?
+  category        String
+  label           String
+  value           String?
+  source          String        @default("conversation")
+  confidence      Float?
+  saved           Boolean       @default(true)
+  capturedAt      DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, category])
+  @@index([customerId])
+}
+
+model ReservationFact {
+  id              String        @id @default(cuid())
+  tenantId        String
+  customerId      String?
+  conversationId  String?
+  reservationId   String?
+  category        String
+  label           String
+  value           Json?
+  source          String        @default("conversation")
+  confidence      Float?
+  capturedAt      DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  reservation     Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, category])
+  @@index([conversationId])
+  @@index([reservationId])
+}
+
+model AiDraft {
+  id              String        @id @default(cuid())
+  tenantId        String
+  conversationId  String
+  messageId       String?
+  status          AiDraftStatus @default(drafted)
+  intent          String?
+  text            String
+  model           String?
+  confidence      Float?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message         Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([conversationId])
+}
+
+model HumanReview {
+  id              String             @id @default(cuid())
+  tenantId        String
+  conversationId  String
+  messageId       String?
+  status          HumanReviewStatus  @default(open)
+  reason          String
+  details         Json?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation    Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message         Message?           @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([conversationId])
+}
