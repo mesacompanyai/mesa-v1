@@ -1,5 +1,5 @@
 // Mesa — main app
-const { useState: useStateApp } = React;
+const { useEffect: useEffectApp, useState: useStateApp } = React;
 
 const DEFAULT_CONVERSATION_RETENTION = {
   preset: "30d",
@@ -12,24 +12,145 @@ const CONVERSATION_RETENTION_DAYS = {
   "30d": 30,
 };
 
+const MESA_API_BASE_URL = window.MESA_API_BASE_URL || "";
+
+function buildMockRestaurantConfig() {
+  const r = window.MOCK_RESTAURANT || {};
+  return {
+    id: "mock-restaurant",
+    name: r.name || "Restaurante",
+    style: r.style || "",
+    description: window.MOCK_RESTAURANT_DESCRIPTION || "",
+    timezone: "America/Sao_Paulo",
+    businessHours: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map(day => ({
+      day,
+      enabled: !!r.characteristics?.weekdays?.[day],
+      open: r.characteristics?.open || "12:00",
+      close: r.characteristics?.close || "23:30",
+    })),
+    aiGuide: {
+      topics: (window.MOCK_AI_QUESTIONS || []).map(topic => ({ fixed: true, ...topic })),
+    },
+    settings: {
+      autonomy: "media",
+      tone: "Acolhedor, objetivo e profissional.",
+      characteristics: {
+        petFriendly: !!r.characteristics?.petFriendly,
+        outdoor: !!r.characteristics?.outdoor,
+        highEnd: !!r.characteristics?.highEnd,
+        birthdays: !!r.characteristics?.birthdays,
+      },
+      teamContactTriggers: {
+        waitingCustomer: true,
+        reservationScheduled: true,
+        reservationArriving: true,
+        reservationCancelled: true,
+        ...(r.teamContactTriggers || {}),
+      },
+      menuSettings: {
+        canSendFiles: r.menuSettings?.canSendFiles ?? true,
+        sendMode: r.menuSettings?.sendMode || "on_request",
+      },
+      humanReviewTriggers: [],
+    },
+  };
+}
+
+function normalizeRestaurantConfig(input = {}) {
+  const fallback = buildMockRestaurantConfig();
+  return {
+    ...fallback,
+    ...input,
+    description: input.description ?? fallback.description,
+    businessHours: Array.isArray(input.businessHours) ? input.businessHours : fallback.businessHours,
+    aiGuide: {
+      ...fallback.aiGuide,
+      ...(input.aiGuide || {}),
+      topics: Array.isArray(input.aiGuide?.topics) ? input.aiGuide.topics : fallback.aiGuide.topics,
+    },
+    settings: {
+      ...fallback.settings,
+      ...(input.settings || {}),
+      characteristics: {
+        ...fallback.settings.characteristics,
+        ...(input.settings?.characteristics || {}),
+      },
+      teamContactTriggers: {
+        ...fallback.settings.teamContactTriggers,
+        ...(input.settings?.teamContactTriggers || {}),
+      },
+      menuSettings: {
+        ...fallback.settings.menuSettings,
+        ...(input.settings?.menuSettings || {}),
+      },
+    },
+  };
+}
+
+function mergeRestaurantConfig(current, patch) {
+  return normalizeRestaurantConfig({
+    ...current,
+    ...patch,
+    aiGuide: {
+      ...(current.aiGuide || {}),
+      ...(patch.aiGuide || {}),
+    },
+    settings: {
+      ...(current.settings || {}),
+      ...(patch.settings || {}),
+      characteristics: {
+        ...(current.settings?.characteristics || {}),
+        ...(patch.settings?.characteristics || {}),
+      },
+      teamContactTriggers: {
+        ...(current.settings?.teamContactTriggers || {}),
+        ...(patch.settings?.teamContactTriggers || {}),
+      },
+      menuSettings: {
+        ...(current.settings?.menuSettings || {}),
+        ...(patch.settings?.menuSettings || {}),
+      },
+    },
+  });
+}
+
+async function mesaApi(path, options = {}) {
+  const response = await fetch(`${MESA_API_BASE_URL}/api${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Mesa API ${response.status}`);
+  }
+
+  return response.status === 204 ? null : response.json();
+}
+
 function normalizeTable(table, index) {
   const legacyNumber = String(table.id || "").match(/\d+/)?.[0];
   const number = Number(table.number ?? legacyNumber ?? index + 1);
   const legacyLocation = String(table.area || "").toLowerCase().includes("externa") ? "outside" : "inside";
 
   return {
-    uid: table.uid || `table-${index + 1}`,
+    uid: table.uid || table.id || `table-${index + 1}`,
+    id: table.id || table.uid || `table-${index + 1}`,
     number: Number.isInteger(number) && number > 0 ? number : index + 1,
     location: table.location || legacyLocation,
     seats: Number(table.seats) || 2,
+    active: table.active ?? true,
   };
 }
 
 function normalizeTeamMember(member, index) {
   return {
     uid: member.uid || member.id || `team-${index + 1}`,
+    id: member.id || member.uid || `team-${index + 1}`,
     name: member.name || "",
-    phone: member.phone || "",
+    phone: member.phone || member.phoneE164 || "",
     activeToday: member.activeToday ?? true,
   };
 }
@@ -85,6 +206,7 @@ function App() {
 
   const [page, setPage] = useStateApp("reservas");
   const [wppConnected, setWppConnected] = useStateApp(true);
+  const [restaurantConfig, setRestaurantConfig] = useStateApp(() => normalizeRestaurantConfig());
   const [tables, setTables] = useStateApp(() => window.MOCK_TABLES.map(normalizeTable));
   const [team, setTeam] = useStateApp(() => window.MOCK_TEAM.map(normalizeTeamMember));
   const [conversations, setConversations] = useStateApp(() => window.MOCK_CONVERSATIONS.map(conversation => ({
@@ -116,35 +238,119 @@ function App() {
     deleteConversationsByIds(getExpiredConversationIds(conversations, conversationRetention));
   }, [conversations, conversationRetention]);
 
+  useEffectApp(() => {
+    let cancelled = false;
+    mesaApi("/configuration")
+      .then((configuration) => {
+        if (cancelled) return;
+        setRestaurantConfig(normalizeRestaurantConfig(configuration.restaurant));
+        setTables((configuration.tables || []).map(normalizeTable));
+        setTeam((configuration.team || []).map(normalizeTeamMember));
+      })
+      .catch((error) => {
+        console.warn("Mesa API unavailable; using local mock state.", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const saveRestaurantConfig = async (patch) => {
+    setRestaurantConfig(current => mergeRestaurantConfig(current, patch));
+    try {
+      const updated = await mesaApi("/configuration/restaurant", {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+      setRestaurantConfig(current => mergeRestaurantConfig(current, updated));
+    } catch (error) {
+      console.warn("Could not persist restaurant configuration.", error);
+    }
+  };
+
   const showAlert = t.showWhatsappAlert && !wppConnected ? true : t.showWhatsappAlert;
   const tableManagerProps = {
     tables,
-    onCreateTable: (table) => {
+    onCreateTable: async (table) => {
+      const temp = { uid: `table-${Date.now()}-${Math.random().toString(16).slice(2)}`, id: null, ...table };
       setTables(current => [
         ...current,
-        { uid: `table-${Date.now()}-${Math.random().toString(16).slice(2)}`, ...table },
+        temp,
       ]);
+      try {
+        const saved = await mesaApi("/configuration/tables", {
+          method: "POST",
+          body: JSON.stringify(table),
+        });
+        setTables(current => current.map(item => item.uid === temp.uid ? normalizeTable(saved, current.length) : item));
+      } catch (error) {
+        console.warn("Could not persist table.", error);
+      }
     },
-    onUpdateTable: (uid, nextTable) => {
+    onUpdateTable: async (uid, nextTable) => {
       setTables(current => current.map(table => table.uid === uid ? { ...table, ...nextTable } : table));
+      const table = tables.find(item => item.uid === uid);
+      if (!table?.id) return;
+      try {
+        await mesaApi(`/configuration/tables/${encodeURIComponent(table.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(nextTable),
+        });
+      } catch (error) {
+        console.warn("Could not persist table update.", error);
+      }
     },
-    onDeleteTable: (uid) => {
+    onDeleteTable: async (uid) => {
+      const table = tables.find(item => item.uid === uid);
       setTables(current => current.filter(table => table.uid !== uid));
+      if (!table?.id) return;
+      try {
+        await mesaApi(`/configuration/tables/${encodeURIComponent(table.id)}`, { method: "DELETE" });
+      } catch (error) {
+        console.warn("Could not delete table.", error);
+      }
     },
   };
   const teamManagerProps = {
     team,
-    onCreateTeamMember: (member) => {
+    onCreateTeamMember: async (member) => {
+      const temp = { uid: `team-${Date.now()}-${Math.random().toString(16).slice(2)}`, id: null, ...member };
       setTeam(current => [
         ...current,
-        { uid: `team-${Date.now()}-${Math.random().toString(16).slice(2)}`, ...member },
+        temp,
       ]);
+      try {
+        const saved = await mesaApi("/configuration/team", {
+          method: "POST",
+          body: JSON.stringify({ ...member, phone: member.phone }),
+        });
+        setTeam(current => current.map(item => item.uid === temp.uid ? normalizeTeamMember(saved, current.length) : item));
+      } catch (error) {
+        console.warn("Could not persist team member.", error);
+      }
     },
-    onUpdateTeamMember: (uid, nextMember) => {
+    onUpdateTeamMember: async (uid, nextMember) => {
       setTeam(current => current.map(member => member.uid === uid ? { ...member, ...nextMember } : member));
+      const member = team.find(item => item.uid === uid);
+      if (!member?.id) return;
+      try {
+        await mesaApi(`/configuration/team/${encodeURIComponent(member.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ ...nextMember, phone: nextMember.phone }),
+        });
+      } catch (error) {
+        console.warn("Could not persist team member update.", error);
+      }
     },
-    onDeleteTeamMember: (uid) => {
+    onDeleteTeamMember: async (uid) => {
+      const member = team.find(item => item.uid === uid);
       setTeam(current => current.filter(member => member.uid !== uid));
+      if (!member?.id) return;
+      try {
+        await mesaApi(`/configuration/team/${encodeURIComponent(member.id)}`, { method: "DELETE" });
+      } catch (error) {
+        console.warn("Could not delete team member.", error);
+      }
     },
   };
 
@@ -213,6 +419,8 @@ function App() {
           <GeralPage
             wppConnected={wppConnected}
             setWppConnected={setWppConnected}
+            restaurantConfig={restaurantConfig}
+            onRestaurantChange={saveRestaurantConfig}
             conversationCount={conversations.length}
             conversationRetention={conversationRetention}
             onRetentionChange={setConversationRetention}

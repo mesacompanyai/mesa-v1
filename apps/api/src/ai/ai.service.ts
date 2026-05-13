@@ -2,25 +2,15 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import OpenAI from "openai";
 import { toFile } from "openai/uploads";
-
-export type ConversationAnalysis = {
-  intent: string;
-  replyDraft: string;
-  requiresHumanReview: boolean;
-  memories: Array<{
-    scope: "lifetime" | "reservation";
-    category: string;
-    label: string;
-    value?: string;
-    confidence?: number;
-  }>;
-  reservationFacts: Array<{
-    category: string;
-    label: string;
-    value?: unknown;
-    confidence?: number;
-  }>;
-};
+import {
+  CONVERSATION_ANALYSIS_JSON_SCHEMA,
+  ConversationAnalysis,
+  ConversationAnalysisSchema,
+  fallbackConversationAnalysis,
+  OPENAI_DEFAULT_TEXT_MODEL,
+  OPENAI_DEFAULT_TRANSCRIPTION_MODEL,
+  OPENAI_DEFAULT_VISION_MODEL,
+} from "../../../../packages/shared/src";
 
 @Injectable()
 export class AiService {
@@ -39,17 +29,25 @@ export class AiService {
     text: string;
   }): Promise<ConversationAnalysis> {
     if (!this.client) {
-      return this.fallbackAnalysis(input.text);
+      return fallbackConversationAnalysis(input.text, "openai_not_configured");
     }
 
-    const model = this.config.get<string>("OPENAI_TEXT_MODEL") || "gpt-4.1-mini";
+    const model = this.config.get<string>("OPENAI_TEXT_MODEL") || OPENAI_DEFAULT_TEXT_MODEL;
     const response = await this.client.responses.create({
       model,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "mesa_conversation_analysis",
+          strict: true,
+          schema: CONVERSATION_ANALYSIS_JSON_SCHEMA,
+        },
+      },
       input: [
         {
           role: "system",
           content:
-            "You are Mesa, a restaurant reservation assistant. Return only strict JSON with keys: intent, replyDraft, requiresHumanReview, memories, reservationFacts. The product is in pilot mode, so sensitive confirmations should require human review.",
+            "You are Mesa, a Portuguese-speaking restaurant reservation assistant. Analyze the message against the restaurant guide, extract reservation data, and return only the required structured output. Keep customer-facing replies concise and natural in Portuguese.",
         },
         {
           role: "user",
@@ -66,7 +64,7 @@ export class AiService {
     try {
       return ConversationAnalysisSchema.parse(JSON.parse(outputText));
     } catch {
-      return this.fallbackAnalysis(input.text);
+      return fallbackConversationAnalysis(input.text, "invalid_openai_output");
     }
   }
 
@@ -79,7 +77,7 @@ export class AiService {
       throw new Error("OPENAI_API_KEY is required for audio transcription");
     }
 
-    const model = this.config.get<string>("OPENAI_TRANSCRIPTION_MODEL") || "gpt-4o-mini-transcribe";
+    const model = this.config.get<string>("OPENAI_TRANSCRIPTION_MODEL") || OPENAI_DEFAULT_TRANSCRIPTION_MODEL;
     const transcription = await this.client.audio.transcriptions.create({
       file: await toFile(input.buffer, input.fileName, { type: input.mimeType }),
       model,
@@ -96,7 +94,7 @@ export class AiService {
       throw new Error("OPENAI_API_KEY is required for image analysis");
     }
 
-    const model = this.config.get<string>("OPENAI_VISION_MODEL") || "gpt-4.1-mini";
+    const model = this.config.get<string>("OPENAI_VISION_MODEL") || OPENAI_DEFAULT_VISION_MODEL;
     const response = await this.client.responses.create({
       model,
       input: [
@@ -120,46 +118,4 @@ export class AiService {
 
     return (response as { output_text?: string }).output_text || "";
   }
-
-  private fallbackAnalysis(text: string): ConversationAnalysis {
-    return {
-      intent: "needs_review",
-      replyDraft: "Recebemos sua mensagem. A equipe vai revisar e responder em seguida.",
-      requiresHumanReview: true,
-      memories: [],
-      reservationFacts: [
-        {
-          category: "observacao",
-          label: text.slice(0, 120),
-          value: text,
-          confidence: 0.3,
-        },
-      ],
-    };
-  }
 }
-
-import { z } from "zod";
-
-const MemorySchema = z.object({
-  scope: z.enum(["lifetime", "reservation"]).default("reservation"),
-  category: z.string().default("observacao"),
-  label: z.string().default("Memoria capturada"),
-  value: z.string().optional(),
-  confidence: z.number().min(0).max(1).optional(),
-});
-
-const ReservationFactSchema = z.object({
-  category: z.string().default("observacao"),
-  label: z.string().default("Fato da reserva"),
-  value: z.unknown().optional(),
-  confidence: z.number().min(0).max(1).optional(),
-});
-
-const ConversationAnalysisSchema = z.object({
-  intent: z.string().default("unknown"),
-  replyDraft: z.string().default("Recebemos sua mensagem. A equipe vai revisar e responder em seguida."),
-  requiresHumanReview: z.boolean().default(true),
-  memories: z.array(MemorySchema).default([]),
-  reservationFacts: z.array(ReservationFactSchema).default([]),
-});

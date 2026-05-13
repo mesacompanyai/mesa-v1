@@ -356,6 +356,7 @@ model Reservation {
   restaurantId    String?
   customerId      String?
   conversationId  String?
+  tableId         String?
   status          ReservationStatus @default(draft)
   startsAt        DateTime
   partySize       Int
@@ -370,11 +371,13 @@ model Reservation {
   restaurant      Restaurant?       @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
   customer        Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   conversation    Conversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  diningTable     DiningTable?      @relation(fields: [tableId], references: [id], onDelete: SetNull)
   reservationFacts ReservationFact[]
 
   @@index([tenantId, startsAt])
   @@index([customerId])
   @@index([conversationId])
+  @@index([tableId])
 }
 
 model DiningTable {
@@ -390,6 +393,7 @@ model DiningTable {
   updatedAt     DateTime    @updatedAt
   tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   restaurant    Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  reservations  Reservation[]
 
   @@unique([tenantId, restaurantId, number])
   @@index([tenantId])

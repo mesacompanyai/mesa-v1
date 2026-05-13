@@ -24,12 +24,13 @@ function TablesManager({
     number: "",
     location: "inside",
     seats: "",
+    active: true,
   });
   const [tableDeleteTarget, setTableDeleteTarget] = useStateTablesManager(null);
   const [openTableMenuId, setOpenTableMenuId] = useStateTablesManager(null);
 
   const resetTableDraft = () => {
-    setTableDraft({ uid: null, number: "", location: "inside", seats: "" });
+    setTableDraft({ uid: null, number: "", location: "inside", seats: "", active: true });
   };
   const openNewTableForm = () => {
     setOpenTableMenuId(null);
@@ -43,6 +44,7 @@ function TablesManager({
       number: String(table.number || ""),
       location: table.location || "inside",
       seats: String(table.seats || ""),
+      active: table.active ?? true,
     });
     setTableModalMode("edit");
   };
@@ -70,6 +72,7 @@ function TablesManager({
       number: tableNumber,
       location: tableDraft.location || "inside",
       seats: tableSeats,
+      active: !!tableDraft.active,
     };
 
     if (tableModalMode === "edit") {
@@ -165,6 +168,18 @@ function TablesManager({
                 placeholder="4"
               />
             </div>
+            <label className="team-active-check">
+              <input
+                type="checkbox"
+                checked={!!tableDraft.active}
+                onChange={(e) => updateTableDraft("active", e.target.checked)}
+              />
+              <span className="team-checkmark"><Icon name="check" size={12} /></span>
+              <span>
+                <strong>Mesa ativa</strong>
+                <small>A IA pode usar esta mesa para reservas.</small>
+              </span>
+            </label>
           </div>
           <div className="table-editor-actions">
             <button type="button" className="btn" onClick={closeTableForm}>Cancelar</button>
@@ -191,7 +206,7 @@ function TablesManager({
       {tables.length ? (
         <div className="tables-grid">
           {tables.map(table => (
-            <div key={table.uid} className="table-card">
+            <div key={table.uid} className={`table-card ${table.active === false ? "inactive" : ""}`}>
               <div className="table-card-actions">
                 <button
                   className="table-card-action"
@@ -218,6 +233,7 @@ function TablesManager({
               <div className="table-card-name">Mesa {table.number}</div>
               <div className="table-card-area"><TableLocationLabel location={table.location} /></div>
               <div className="table-card-seats"><Icon name="person" size={11} />{table.seats}</div>
+              {table.active === false && <div className="team-member-status inactive">Inativa</div>}
             </div>
           ))}
         </div>

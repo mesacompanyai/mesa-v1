@@ -7,7 +7,12 @@ import { Worker } from "bullmq";
 import OpenAI from "openai";
 import { toFile } from "openai/uploads";
 import sharp from "sharp";
-import { MediaProcessingJob, QUEUE_NAMES } from "../../../packages/shared/src";
+import {
+  MediaProcessingJob,
+  OPENAI_DEFAULT_TRANSCRIPTION_MODEL,
+  OPENAI_DEFAULT_VISION_MODEL,
+  QUEUE_NAMES,
+} from "../../../packages/shared/src";
 import { createRedisConnection } from "../../../packages/shared/src/redis";
 
 const prisma = new PrismaClient();
@@ -205,7 +210,7 @@ async function analyzeImage(mediaAssetId: string, storageKey: string) {
 
   const signedUrl = await getReadUrl(storageKey);
   const response = await openai.responses.create({
-    model: process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini",
+    model: process.env.OPENAI_VISION_MODEL || OPENAI_DEFAULT_VISION_MODEL,
     input: [
       {
         role: "user",
@@ -244,7 +249,7 @@ async function analyzeImage(mediaAssetId: string, storageKey: string) {
 async function transcribeAudio(mediaAssetId: string, buffer: Buffer, fileName: string, mimeType: string) {
   if (!openai) return;
 
-  const model = process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe";
+  const model = process.env.OPENAI_TRANSCRIPTION_MODEL || OPENAI_DEFAULT_TRANSCRIPTION_MODEL;
   const transcription = await openai.audio.transcriptions.create({
     file: await toFile(buffer, fileName, { type: mimeType }),
     model,

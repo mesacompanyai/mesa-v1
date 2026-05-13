@@ -1,27 +1,31 @@
 // Geral page — 4 sub-areas
 const { useEffect: useEffectGeral, useRef: useRefGeral, useState: useStateGeral } = React;
 
-function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
-  const r = window.MOCK_RESTAURANT;
+function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable, restaurantConfig, onRestaurantChange = () => {} }) {
+  const r = restaurantConfig || {};
+  const settings = r.settings || {};
+  const characteristics = settings.characteristics || {};
   const businessDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-  const [questions, setQuestions] = useStateGeral(() => window.MOCK_AI_QUESTIONS.map(q => ({ fixed: true, ...q })));
-  const [autonomy, setAutonomy] = useStateGeral("media");
+  const findBusinessHour = (hours, day) => (hours || []).find(item => item.day === day || (day === "Sáb" && item.day === "Sab"));
+  const [description, setDescription] = useStateGeral(() => r.description || window.MOCK_RESTAURANT_DESCRIPTION || "");
+  const [questions, setQuestions] = useStateGeral(() => (r.aiGuide?.topics || window.MOCK_AI_QUESTIONS || []).map(q => ({ fixed: true, ...q })));
+  const [autonomy, setAutonomy] = useStateGeral(settings.autonomy || "media");
   const [teamContactTriggers, setTeamContactTriggers] = useStateGeral(() => ({
     waitingCustomer: true,
     reservationScheduled: true,
     reservationArriving: true,
     reservationCancelled: true,
-    ...(r.teamContactTriggers || {}),
+    ...(settings.teamContactTriggers || {}),
   }));
   const [businessHours, setBusinessHours] = useStateGeral(() => businessDays.map(day => ({
     day,
-    enabled: !!r.characteristics.weekdays[day],
-    open: r.characteristics.open,
-    close: r.characteristics.close,
+    enabled: !!findBusinessHour(r.businessHours, day)?.enabled,
+    open: findBusinessHour(r.businessHours, day)?.open || "12:00",
+    close: findBusinessHour(r.businessHours, day)?.close || "23:30",
   })));
   const [menuFiles, setMenuFiles] = useStateGeral([]);
-  const [canSendMenuFiles, setCanSendMenuFiles] = useStateGeral(r.menuSettings?.canSendFiles ?? true);
-  const [menuSendMode, setMenuSendMode] = useStateGeral(r.menuSettings?.sendMode || "on_request");
+  const [canSendMenuFiles, setCanSendMenuFiles] = useStateGeral(settings.menuSettings?.canSendFiles ?? true);
+  const [menuSendMode, setMenuSendMode] = useStateGeral(settings.menuSettings?.sendMode || "on_request");
   const [editingId, setEditingId] = useStateGeral(null);
   const [draftLabel, setDraftLabel] = useStateGeral("");
   const [draggingId, setDraggingId] = useStateGeral(null);
@@ -30,12 +34,70 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
   const guideListRef = useRefGeral(null);
   const menuFileInputRef = useRefGeral(null);
 
-  const toggleQ = (id) => setQuestions(qs => qs.map(q => q.id === id ? { ...q, enabled: !q.enabled } : q));
+  useEffectGeral(() => {
+    setDescription(r.description || "");
+    setQuestions((r.aiGuide?.topics || window.MOCK_AI_QUESTIONS || []).map(q => ({ fixed: true, ...q })));
+    setAutonomy(settings.autonomy || "media");
+    setTeamContactTriggers({
+      waitingCustomer: true,
+      reservationScheduled: true,
+      reservationArriving: true,
+      reservationCancelled: true,
+      ...(settings.teamContactTriggers || {}),
+    });
+    setBusinessHours(businessDays.map(day => {
+      const row = findBusinessHour(r.businessHours, day);
+      return { day, enabled: !!row?.enabled, open: row?.open || "12:00", close: row?.close || "23:30" };
+    }));
+    setCanSendMenuFiles(settings.menuSettings?.canSendFiles ?? true);
+    setMenuSendMode(settings.menuSettings?.sendMode || "on_request");
+  }, [r.id]);
+
+  const updateQuestions = (updater) => {
+    setQuestions(qs => {
+      const next = typeof updater === "function" ? updater(qs) : updater;
+      onRestaurantChange({ aiGuide: { topics: next } });
+      return next;
+    });
+  };
+  const toggleQ = (id) => updateQuestions(qs => qs.map(q => q.id === id ? { ...q, enabled: !q.enabled } : q));
   const toggleTeamContact = (id) => {
-    setTeamContactTriggers(triggers => ({ ...triggers, [id]: !triggers[id] }));
+    setTeamContactTriggers(triggers => {
+      const next = { ...triggers, [id]: !triggers[id] };
+      onRestaurantChange({ settings: { teamContactTriggers: next } });
+      return next;
+    });
   };
   const updateBusinessHours = (day, patch) => {
-    setBusinessHours(hours => hours.map(item => item.day === day ? { ...item, ...patch } : item));
+    setBusinessHours(hours => {
+      const next = hours.map(item => item.day === day ? { ...item, ...patch } : item);
+      onRestaurantChange({ businessHours: next });
+      return next;
+    });
+  };
+  const updateCharacteristics = (field, value) => {
+    onRestaurantChange({
+      settings: {
+        characteristics: {
+          ...characteristics,
+          [field]: value,
+        },
+      },
+    });
+  };
+  const updateAutonomy = (nextAutonomy) => {
+    setAutonomy(nextAutonomy);
+    onRestaurantChange({ settings: { autonomy: nextAutonomy } });
+  };
+  const updateMenuSettings = (patch) => {
+    const next = {
+      canSendFiles: canSendMenuFiles,
+      sendMode: menuSendMode,
+      ...patch,
+    };
+    if (Object.prototype.hasOwnProperty.call(patch, "canSendFiles")) setCanSendMenuFiles(next.canSendFiles);
+    if (Object.prototype.hasOwnProperty.call(patch, "sendMode")) setMenuSendMode(next.sendMode);
+    onRestaurantChange({ settings: { menuSettings: next } });
   };
   const addMenuFiles = (e) => {
     const files = Array.from(e.target.files || []);
@@ -78,26 +140,26 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
   const addTopic = () => {
     if (editingId) return;
     const id = `extra-${Date.now()}`;
-    setQuestions(qs => [...qs, { id, label: "", enabled: true, required: false, fixed: false }]);
+    updateQuestions(qs => [...qs, { id, label: "", enabled: true, required: false, fixed: false }]);
     setEditingId(id);
     setDraftLabel("");
   };
   const commitTopic = (id) => {
     const label = draftLabel.trim();
     if (!label) return;
-    setQuestions(qs => qs.map(q => q.id === id ? { ...q, label } : q));
+    updateQuestions(qs => qs.map(q => q.id === id ? { ...q, label } : q));
     setEditingId(null);
     setDraftLabel("");
   };
   const cancelEdit = (id) => {
-    setQuestions(qs => qs.filter(q => q.fixed || q.id !== id || q.label.trim()));
+    updateQuestions(qs => qs.filter(q => q.fixed || q.id !== id || q.label.trim()));
     setEditingId(null);
     setDraftLabel("");
   };
-  const removeTopic = (id) => setQuestions(qs => qs.filter(q => q.fixed || q.id !== id));
+  const removeTopic = (id) => updateQuestions(qs => qs.filter(q => q.fixed || q.id !== id));
   const moveTopic = (targetId, sourceId = draggingId) => {
     if (!sourceId || sourceId === targetId) return;
-    setQuestions(qs => {
+    updateQuestions(qs => {
       const from = qs.findIndex(q => q.id === sourceId);
       const to = qs.findIndex(q => q.id === targetId);
       if (from < 0 || to < 0) return qs;
@@ -176,7 +238,13 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
       <div className="section-card">
         <h2>Conte um pouco sobre seu restaurante</h2>
         <div className="section-card-subtitle">Descreva a casa, o estilo de atendimento, ambiente e detalhes que ajudam a IA a entender o estabelecimento</div>
-        <textarea className="field-textarea" defaultValue={window.MOCK_RESTAURANT_DESCRIPTION} rows={7} />
+        <textarea
+          className="field-textarea"
+          value={description}
+          rows={7}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={() => onRestaurantChange({ description })}
+        />
       </div>
 
       <div className="section-card">
@@ -263,7 +331,7 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
           ].map(opt => (
             <button
               key={opt.id}
-              onClick={() => setAutonomy(opt.id)}
+              onClick={() => updateAutonomy(opt.id)}
               className={`autonomy-option ${autonomy === opt.id ? "active" : ""}`}
             >
               <div className="autonomy-option-title">{opt.label}</div>
@@ -302,28 +370,28 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
             <div className="row-flex-title">Pet friendly</div>
             <div className="row-flex-sub">Aceita animais de estimação</div>
           </div>
-          <label className="toggle"><input type="checkbox" defaultChecked={r.characteristics.petFriendly} /><span className="toggle-slider"/></label>
+          <label className="toggle"><input type="checkbox" checked={!!characteristics.petFriendly} onChange={(e) => updateCharacteristics("petFriendly", e.target.checked)} /><span className="toggle-slider"/></label>
         </div>
         <div className="row-flex">
           <div className="row-flex-main">
             <div className="row-flex-title">Área externa</div>
             <div className="row-flex-sub">Possui mesas ao ar livre</div>
           </div>
-          <label className="toggle"><input type="checkbox" defaultChecked={r.characteristics.outdoor} /><span className="toggle-slider"/></label>
+          <label className="toggle"><input type="checkbox" checked={!!characteristics.outdoor} onChange={(e) => updateCharacteristics("outdoor", e.target.checked)} /><span className="toggle-slider"/></label>
         </div>
         <div className="row-flex">
           <div className="row-flex-main">
             <div className="row-flex-title">Alto padrão</div>
             <div className="row-flex-sub">Estilo de atendimento mais formal</div>
           </div>
-          <label className="toggle"><input type="checkbox" defaultChecked={r.characteristics.highEnd} /><span className="toggle-slider"/></label>
+          <label className="toggle"><input type="checkbox" checked={!!characteristics.highEnd} onChange={(e) => updateCharacteristics("highEnd", e.target.checked)} /><span className="toggle-slider"/></label>
         </div>
         <div className="row-flex">
           <div className="row-flex-main">
             <div className="row-flex-title">Aceita aniversários</div>
             <div className="row-flex-sub">Permite bolo, decoração simples e velas</div>
           </div>
-          <label className="toggle"><input type="checkbox" defaultChecked={r.characteristics.birthdays} /><span className="toggle-slider"/></label>
+          <label className="toggle"><input type="checkbox" checked={!!characteristics.birthdays} onChange={(e) => updateCharacteristics("birthdays", e.target.checked)} /><span className="toggle-slider"/></label>
         </div>
       </div>
 
@@ -423,7 +491,7 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
             <div className="row-flex-sub">Permite que a IA compartilhe o cardápio pelo WhatsApp durante a conversa</div>
           </div>
           <label className="toggle">
-            <input type="checkbox" checked={canSendMenuFiles} onChange={() => setCanSendMenuFiles(v => !v)} />
+            <input type="checkbox" checked={canSendMenuFiles} onChange={() => updateMenuSettings({ canSendFiles: !canSendMenuFiles })} />
             <span className="toggle-slider" />
           </label>
         </div>
@@ -437,7 +505,7 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable }) {
               key={opt.id}
               className={`menu-send-option ${menuSendMode === opt.id ? "active" : ""}`}
               disabled={!canSendMenuFiles}
-              onClick={() => setMenuSendMode(opt.id)}
+              onClick={() => updateMenuSettings({ sendMode: opt.id })}
             >
               <div className="menu-send-option-title">{opt.label}</div>
               <div className="menu-send-option-desc">{opt.desc}</div>
@@ -533,12 +601,14 @@ const GERAL_RETENTION_OPTIONS = [
 ];
 
 function GeralConfig({
+  restaurantConfig,
+  onRestaurantChange = () => {},
   conversationCount = 0,
   conversationRetention = { preset: "30d", customDays: 30 },
   onRetentionChange = () => {},
   onDeleteAllConversations = () => {},
 }) {
-  const r = window.MOCK_RESTAURANT;
+  const r = restaurantConfig || window.MOCK_RESTAURANT;
   const [deleteModalOpen, setDeleteModalOpen] = useStateGeral(false);
   const retentionPreset = conversationRetention.preset || "30d";
   const customDays = Math.max(1, Math.floor(Number(conversationRetention.customDays) || 30));
@@ -574,11 +644,19 @@ function GeralConfig({
           <h2>Informações do restaurante</h2>
           <div className="field">
             <label className="field-label">Nome</label>
-            <input className="field-input" defaultValue={r.name} />
+            <input
+              className="field-input"
+              defaultValue={r.name}
+              onBlur={(e) => onRestaurantChange({ name: e.target.value })}
+            />
           </div>
           <div className="field">
             <label className="field-label">Estilo</label>
-            <input className="field-input" defaultValue={r.style} />
+            <input
+              className="field-input"
+              defaultValue={r.style}
+              onBlur={(e) => onRestaurantChange({ style: e.target.value })}
+            />
           </div>
         </div>
 
@@ -701,6 +779,8 @@ function GeralConfig({
 function GeralPage({
   wppConnected,
   setWppConnected,
+  restaurantConfig,
+  onRestaurantChange,
   tables,
   onCreateTable,
   onUpdateTable,
@@ -746,6 +826,8 @@ function GeralPage({
             onCreateTable={onCreateTable}
             onUpdateTable={onUpdateTable}
             onDeleteTable={onDeleteTable}
+            restaurantConfig={restaurantConfig}
+            onRestaurantChange={onRestaurantChange}
           />
         )}
         {section === "conn" && <GeralConexoes wppConnected={wppConnected} setWppConnected={setWppConnected} />}
@@ -763,6 +845,8 @@ function GeralPage({
             conversationRetention={conversationRetention}
             onRetentionChange={onRetentionChange}
             onDeleteAllConversations={onDeleteAllConversations}
+            restaurantConfig={restaurantConfig}
+            onRestaurantChange={onRestaurantChange}
           />
         )}
       </div>

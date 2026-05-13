@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  OPENAI_DEFAULT_TEXT_MODEL,
+  OPENAI_DEFAULT_TRANSCRIPTION_MODEL,
+  OPENAI_DEFAULT_VISION_MODEL,
+} from "../../../../packages/shared/src";
 
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -16,9 +21,9 @@ const environmentSchema = z.object({
   R2_BUCKET: z.string().optional(),
   R2_PUBLIC_BASE_URL: z.string().url().optional().or(z.literal("")),
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_TEXT_MODEL: z.string().default("gpt-4.1-mini"),
-  OPENAI_VISION_MODEL: z.string().default("gpt-4.1-mini"),
-  OPENAI_TRANSCRIPTION_MODEL: z.string().default("gpt-4o-mini-transcribe"),
+  OPENAI_TEXT_MODEL: z.string().default(OPENAI_DEFAULT_TEXT_MODEL),
+  OPENAI_VISION_MODEL: z.string().default(OPENAI_DEFAULT_VISION_MODEL),
+  OPENAI_TRANSCRIPTION_MODEL: z.string().default(OPENAI_DEFAULT_TRANSCRIPTION_MODEL),
   SENTRY_DSN: z.string().url().optional().or(z.literal("")),
 });
 
