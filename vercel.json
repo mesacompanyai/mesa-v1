@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://mesa-api-production-977c.up.railway.app/api/$1" }
+  ],
   "builds": [
     {
       "src": "**/*",

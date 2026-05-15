@@ -1,0 +1,17 @@
+apps/
+packages/
+prisma/
+test/
+scripts/
+docs/
+infra/
+dist/
+node_modules/
+.env*
+*.sh
+package.json
+package-lock.json
+tsconfig.json
+railway.json
+vitest.config.ts
+README.md

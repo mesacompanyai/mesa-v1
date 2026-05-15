@@ -255,7 +255,7 @@ function ConversationsPage({
   messagesByConversation = {},
 } = {}) {
   const [filter, setFilter] = useStateConv("aguardando");
-  const [selectedId, setSelectedId] = useStateConv("c-002");
+  const [selectedId, setSelectedId] = useStateConv(null);
   const [clientsModalOpen, setClientsModalOpen] = useStateConv(false);
   const [memoryState, setMemoryState] = useStateConv({
     conversationId: null,

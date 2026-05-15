@@ -1,0 +1,15 @@
+- dialog "Login" [ref=e9]:
+  - heading "Login" [level=3] [ref=e11]
+  - generic [ref=e12]:
+    - button "Dismiss"
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e21]:
+        - img "Railway Logo" [ref=e23]
+        - generic [ref=e26]:
+          - paragraph [ref=e27]: Welcome to Railway
+          - paragraph [ref=e67]: Instant deployments, effortless scale
+      - button "Continue with GitHub" [ref=e68] [cursor=pointer]:
+        - img [ref=e70]
+        - generic [ref=e72]: Continue with GitHub
+    - button "Log in using email" [active] [ref=e73] [cursor=pointer]
