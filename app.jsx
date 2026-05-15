@@ -54,42 +54,40 @@ function getUserInitials(user) {
   return initials.toUpperCase();
 }
 
-function buildMockRestaurantConfig() {
-  const r = window.MOCK_RESTAURANT || {};
+function buildDefaultRestaurantConfig() {
   return {
-    id: "mock-restaurant",
-    name: r.name || "Restaurante",
-    style: r.style || "",
-    description: window.MOCK_RESTAURANT_DESCRIPTION || "",
+    id: null,
+    name: "Restaurante",
+    style: "",
+    description: "",
     timezone: "America/Sao_Paulo",
     businessHours: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map(day => ({
       day,
-      enabled: !!r.characteristics?.weekdays?.[day],
-      open: r.characteristics?.open || "12:00",
-      close: r.characteristics?.close || "23:30",
+      enabled: false,
+      open: "12:00",
+      close: "23:30",
     })),
     aiGuide: {
-      topics: (window.MOCK_AI_QUESTIONS || []).map(topic => ({ fixed: true, ...topic })),
+      topics: [],
     },
     settings: {
       autonomy: "media",
       tone: "Acolhedor, objetivo e profissional.",
       characteristics: {
-        petFriendly: !!r.characteristics?.petFriendly,
-        outdoor: !!r.characteristics?.outdoor,
-        highEnd: !!r.characteristics?.highEnd,
-        birthdays: !!r.characteristics?.birthdays,
+        petFriendly: false,
+        outdoor: false,
+        highEnd: false,
+        birthdays: false,
       },
       teamContactTriggers: {
         waitingCustomer: true,
         reservationScheduled: true,
         reservationArriving: true,
         reservationCancelled: true,
-        ...(r.teamContactTriggers || {}),
       },
       menuSettings: {
-        canSendFiles: r.menuSettings?.canSendFiles ?? true,
-        sendMode: r.menuSettings?.sendMode || "on_request",
+        canSendFiles: true,
+        sendMode: "on_request",
       },
       humanReviewTriggers: [],
     },
@@ -97,7 +95,7 @@ function buildMockRestaurantConfig() {
 }
 
 function normalizeRestaurantConfig(input = {}) {
-  const fallback = buildMockRestaurantConfig();
+  const fallback = buildDefaultRestaurantConfig();
   return {
     ...fallback,
     ...input,
@@ -453,13 +451,11 @@ function App() {
   const [page, setPage] = useStateApp("reservas");
   const [wppConnected, setWppConnected] = useStateApp(true);
   const [restaurantConfig, setRestaurantConfig] = useStateApp(() => normalizeRestaurantConfig());
-  const [tables, setTables] = useStateApp(() => window.MOCK_TABLES.map(normalizeTable));
-  const [team, setTeam] = useStateApp(() => window.MOCK_TEAM.map(normalizeTeamMember));
-  const [conversations, setConversations] = useStateApp(() => window.MOCK_CONVERSATIONS.map(conversation => ({
-    ...conversation,
-    summary: conversation.summary ? { ...conversation.summary } : conversation.summary,
-  })));
-  const [messagesByConversation, setMessagesByConversation] = useStateApp(() => cloneMessagesByConversation(window.MOCK_MESSAGES));
+  const [tables, setTables] = useStateApp([]);
+  const [team, setTeam] = useStateApp([]);
+  const [conversations, setConversations] = useStateApp([]);
+  const [messagesByConversation, setMessagesByConversation] = useStateApp({});
+  const [reservations, setReservations] = useStateApp([]);
   const [conversationRetention, setConversationRetention] = useStateApp(DEFAULT_CONVERSATION_RETENTION);
 
   const deleteConversationsByIds = (ids) => {
@@ -545,7 +541,15 @@ function App() {
         setTeam((configuration.team || []).map(normalizeTeamMember));
       })
       .catch((error) => {
-        handleApiFailure(error, "Mesa API unavailable; using local mock state.");
+        handleApiFailure(error, "Mesa API unavailable; could not load configuration.");
+      });
+    mesaApi("/reservations", { authToken: authSession.accessToken })
+      .then((data) => {
+        if (cancelled) return;
+        setReservations(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        handleApiFailure(error, "Could not load reservations.");
       });
     return () => {
       cancelled = true;
@@ -720,7 +724,7 @@ function App() {
       )}
 
       <main className="work-area">
-        {page === "reservas"  && <ReservationsPage {...tableManagerProps} {...teamManagerProps} />}
+        {page === "reservas"  && <ReservationsPage {...tableManagerProps} {...teamManagerProps} reservations={reservations} />}
         {page === "conversas" && (
           <ConversationsPage
             conversations={conversations}

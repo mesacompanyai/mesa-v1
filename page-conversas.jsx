@@ -178,7 +178,7 @@ function getMemoryMeta(category) {
 
 function getStoredMemories(conversation, client) {
   if (!conversation) return [];
-  const storedMemories = conversation.memories || client?.memories || window.MOCK_MEMORIES_BY_CONVERSATION?.[conversation.id] || [];
+  const storedMemories = conversation.memories || client?.memories || [];
   return storedMemories.filter(memory => memory.scope === "lifetime");
 }
 
@@ -251,8 +251,8 @@ function ConversationMemoryTags({ memories, loading, apiError }) {
 }
 
 function ConversationsPage({
-  conversations = window.MOCK_CONVERSATIONS || [],
-  messagesByConversation = window.MOCK_MESSAGES || {},
+  conversations = [],
+  messagesByConversation = {},
 } = {}) {
   const [filter, setFilter] = useStateConv("aguardando");
   const [selectedId, setSelectedId] = useStateConv("c-002");
@@ -285,7 +285,7 @@ function ConversationsPage({
 
   const selected = conversations.find(c => c.id === selectedId) || filtered[0] || null;
   const messages = selected ? (messagesByConversation[selected.id] || []) : [];
-  const selectedClient = (window.MOCK_CLIENTS || []).find(client => client.conversationId === selected?.id);
+  const selectedClient = null;
   const fallbackMemories = getStoredMemories(selected, selectedClient);
   const displayedMemories = memoryState.conversationId === selected?.id ? memoryState.memories : fallbackMemories;
 
@@ -533,7 +533,7 @@ function ConversationsPage({
 
       {clientsModalOpen && (
         <ClientsModal
-          clients={window.MOCK_CLIENTS || []}
+          clients={[]}
           selectedConversationId={selected?.id}
           onClose={() => setClientsModalOpen(false)}
         />

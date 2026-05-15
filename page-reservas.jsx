@@ -1,6 +1,50 @@
 // Reservas page
 const { useState } = React;
 
+const RESERVATION_STATUS_MAP = {
+  confirmed: "confirmada",
+  ready_to_confirm: "aguardando",
+  completed: "confirmada",
+  cancelled: "cancelada",
+};
+
+function normalizeApiReservation(r) {
+  const startsAt = r.startsAt ? new Date(r.startsAt) : null;
+  const time = startsAt
+    ? startsAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : "";
+  return {
+    id: r.id,
+    name: r.customer?.name || "Cliente",
+    phone: r.customer?.phoneE164 || "",
+    time,
+    startsAt: r.startsAt || null,
+    table: r.table?.label || r.tableLabel || "",
+    area: r.area || "",
+    party: r.partySize || 0,
+    status: RESERVATION_STATUS_MAP[r.status] || r.status || "aguardando",
+    notes: r.notes || "",
+    diet: [],
+    intolerances: [],
+    children: false,
+    pet: false,
+    celebration: "",
+    areaPref: "",
+  };
+}
+
+function computeDays(rawReservations) {
+  const today = new Date();
+  const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  return Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const count = rawReservations.filter(r => (r.startsAt || "").startsWith(dateStr)).length;
+    return { day: d.getDate(), weekday: weekdays[d.getDay()], count, date: d };
+  });
+}
+
 function StatusPill({ status }) {
   const labels = {
     confirmada: "Confirmada",
@@ -143,15 +187,28 @@ function ReservationsPage({
   onCreateTeamMember,
   onUpdateTeamMember,
   onDeleteTeamMember,
+  reservations = [],
 }) {
+  const today = new Date();
   const [openId, setOpenId] = useState(null);
-  const [activeDay, setActiveDay] = useState(6);
+  const [activeDay, setActiveDay] = useState(today.getDate());
   const [reservationFilter, setReservationFilter] = useState("confirmadas");
   const [tablesModalOpen, setTablesModalOpen] = useState(false);
   const [teamModalOpen, setTeamModalOpen] = useState(false);
 
+  const days = computeDays(reservations);
+  const activeDayEntry = days.find(d => d.day === activeDay) || days[0];
+  const activeDateLabel = activeDayEntry
+    ? activeDayEntry.date.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
+    : "";
+
+  const activeDateStr = activeDayEntry ? activeDayEntry.date.toISOString().slice(0, 10) : "";
+  const reservationsForDay = reservations
+    .filter(r => (r.startsAt || "").startsWith(activeDateStr))
+    .map(normalizeApiReservation);
+
   const selectedFilter = RESERVATION_FILTERS.find(filter => filter.id === reservationFilter) || RESERVATION_FILTERS[0];
-  const filteredReservations = window.MOCK_RESERVATIONS.filter(selectedFilter.matches);
+  const filteredReservations = reservationsForDay.filter(selectedFilter.matches);
   const reservationCountLabel = filteredReservations.length === 1 ? "reserva" : "reservas";
 
   const isOpen = (id) => openId === id;
@@ -163,7 +220,7 @@ function ReservationsPage({
           <div>
             <h1 className="page-title">Reservas</h1>
             <div className="page-subtitle">
-              Quinta-feira, 6 de novembro · {filteredReservations.length} {reservationCountLabel}
+              {activeDateLabel} · {filteredReservations.length} {reservationCountLabel}
             </div>
           </div>
           <div className="reservation-actions">
@@ -193,7 +250,7 @@ function ReservationsPage({
         </div>
 
         <div className="day-strip">
-          {window.MOCK_DAYS.map(d => (
+          {days.map(d => (
             <button
               key={d.day}
               className={`day-chip ${d.day === activeDay ? "active" : ""} ${d.count === 0 ? "empty" : ""}`}

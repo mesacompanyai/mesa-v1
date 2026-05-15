@@ -7,8 +7,8 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable, restaura
   const characteristics = settings.characteristics || {};
   const businessDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
   const findBusinessHour = (hours, day) => (hours || []).find(item => item.day === day || (day === "Sáb" && item.day === "Sab"));
-  const [description, setDescription] = useStateGeral(() => r.description || window.MOCK_RESTAURANT_DESCRIPTION || "");
-  const [questions, setQuestions] = useStateGeral(() => (r.aiGuide?.topics || window.MOCK_AI_QUESTIONS || []).map(q => ({ fixed: true, ...q })));
+  const [description, setDescription] = useStateGeral(() => r.description || "");
+  const [questions, setQuestions] = useStateGeral(() => (r.aiGuide?.topics || []).map(q => ({ fixed: true, ...q })));
   const [autonomy, setAutonomy] = useStateGeral(settings.autonomy || "media");
   const [teamContactTriggers, setTeamContactTriggers] = useStateGeral(() => ({
     waitingCustomer: true,
@@ -36,7 +36,7 @@ function GeralAI({ tables, onCreateTable, onUpdateTable, onDeleteTable, restaura
 
   useEffectGeral(() => {
     setDescription(r.description || "");
-    setQuestions((r.aiGuide?.topics || window.MOCK_AI_QUESTIONS || []).map(q => ({ fixed: true, ...q })));
+    setQuestions((r.aiGuide?.topics || []).map(q => ({ fixed: true, ...q })));
     setAutonomy(settings.autonomy || "media");
     setTeamContactTriggers({
       waitingCustomer: true,
@@ -540,7 +540,7 @@ function GeralConexoes({ wppConnected, setWppConnected }) {
         <div className="connection-main">
           <div className="connection-name">WhatsApp Business</div>
           <div className="connection-sub">
-            {wppConnected ? `${window.MOCK_WHATSAPP.number} · Conectado há 14 dias` : "Desconectado · Última conexão há 2 horas"}
+            {wppConnected ? "Conectado" : "Desconectado"}
           </div>
         </div>
         <StatusPill status={wppConnected ? "confirmada" : "cancelada"} />
@@ -608,7 +608,7 @@ function GeralConfig({
   onRetentionChange = () => {},
   onDeleteAllConversations = () => {},
 }) {
-  const r = restaurantConfig || window.MOCK_RESTAURANT;
+  const r = restaurantConfig || {};
   const [deleteModalOpen, setDeleteModalOpen] = useStateGeral(false);
   const retentionPreset = conversationRetention.preset || "30d";
   const customDays = Math.max(1, Math.floor(Number(conversationRetention.customDays) || 30));
