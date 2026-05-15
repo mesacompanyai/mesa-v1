@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AiModule } from "./ai/ai.module";
+import { AuthModule } from "./auth/auth.module";
 import { ConfigurationModule } from "./configuration/configuration.module";
 import { validateEnvironment } from "./config/environment";
 import { HealthModule } from "./health/health.module";
@@ -21,6 +22,7 @@ import { WhatsappModule } from "./whatsapp/whatsapp.module";
     }),
     PrismaModule,
     TenantContextModule,
+    AuthModule,
     QueuesModule,
     StorageModule,
     AiModule,

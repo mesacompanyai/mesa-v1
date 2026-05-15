@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import {
   DEFAULT_AI_GUIDE_TOPICS,
@@ -10,6 +10,27 @@ import { PrismaService } from "../prisma/prisma.service";
 @Injectable()
 export class TenantContextService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getWorkspaceForTenant(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException("Tenant not found");
+    }
+
+    const restaurant = await this.prisma.restaurant.findFirst({
+      where: { tenantId: tenant.id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!restaurant) {
+      throw new NotFoundException("Restaurant not found");
+    }
+
+    return { tenant, restaurant };
+  }
 
   async getSingleTenantWorkspace() {
     let tenant = await this.prisma.tenant.findFirst({

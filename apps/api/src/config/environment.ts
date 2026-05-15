@@ -12,6 +12,7 @@ const environmentSchema = z.object({
   FRONTEND_URL: z.string().url().optional(),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
+  JWT_SECRET: z.string().min(32),
   EVOLUTION_WEBHOOK_SECRET: z.string().min(12).optional(),
   EVOLUTION_API_URL: z.string().url().optional(),
   EVOLUTION_GLOBAL_API_KEY: z.string().optional(),

@@ -9,9 +9,9 @@ export class MediaService {
     private readonly storage: StorageService,
   ) {}
 
-  async createSignedReadUrl(mediaAssetId: string) {
-    const asset = await this.prisma.mediaAsset.findUnique({
-      where: { id: mediaAssetId },
+  async createSignedReadUrl(tenantId: string, mediaAssetId: string) {
+    const asset = await this.prisma.mediaAsset.findFirst({
+      where: { id: mediaAssetId, tenantId },
       select: {
         id: true,
         storageKey: true,

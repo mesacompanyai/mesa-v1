@@ -7,6 +7,7 @@ import {
   RestaurantAiGuideSchema,
   RestaurantSettingsSchema,
 } from "../../../../packages/shared/src";
+import { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 
@@ -17,8 +18,8 @@ export class ConfigurationService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  async getConfiguration() {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async getConfiguration(user: AuthenticatedUser) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const [tables, team] = await Promise.all([
       this.prisma.diningTable.findMany({
         where: { tenantId: tenant.id, restaurantId: restaurant.id },
@@ -66,8 +67,8 @@ export class ConfigurationService {
     };
   }
 
-  async updateRestaurant(input: unknown) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async updateRestaurant(user: AuthenticatedUser, input: unknown) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const body = UpdateRestaurantSchema.parse(input);
     const currentSettings = parseRestaurantSettings(restaurant.settings);
     const currentGuide = parseRestaurantAiGuide(restaurant.aiGuide);
@@ -123,8 +124,8 @@ export class ConfigurationService {
     };
   }
 
-  async createTable(input: unknown) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async createTable(user: AuthenticatedUser, input: unknown) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const body = TableBodySchema.parse(input);
     return this.prisma.diningTable.create({
       data: {
@@ -139,8 +140,8 @@ export class ConfigurationService {
     });
   }
 
-  async updateTable(id: string, input: unknown) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async updateTable(user: AuthenticatedUser, id: string, input: unknown) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const body = TableBodySchema.partial().parse(input);
     await this.assertTable(id, tenant.id, restaurant.id);
     return this.prisma.diningTable.update({
@@ -149,15 +150,15 @@ export class ConfigurationService {
     });
   }
 
-  async deleteTable(id: string) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async deleteTable(user: AuthenticatedUser, id: string) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     await this.assertTable(id, tenant.id, restaurant.id);
     await this.prisma.diningTable.delete({ where: { id } });
     return { deleted: true };
   }
 
-  async createTeamMember(input: unknown) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async createTeamMember(user: AuthenticatedUser, input: unknown) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const body = TeamBodySchema.parse(input);
     return this.prisma.teamMember.create({
       data: {
@@ -171,8 +172,8 @@ export class ConfigurationService {
     });
   }
 
-  async updateTeamMember(id: string, input: unknown) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async updateTeamMember(user: AuthenticatedUser, id: string, input: unknown) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const body = TeamBodySchema.partial().parse(input);
     await this.assertTeamMember(id, tenant.id, restaurant.id);
     return this.prisma.teamMember.update({
@@ -186,8 +187,8 @@ export class ConfigurationService {
     });
   }
 
-  async deleteTeamMember(id: string) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async deleteTeamMember(user: AuthenticatedUser, id: string) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     await this.assertTeamMember(id, tenant.id, restaurant.id);
     await this.prisma.teamMember.delete({ where: { id } });
     return { deleted: true };

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { ReservationStatus } from "@prisma/client";
 import { z } from "zod";
+import { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 
@@ -11,8 +12,8 @@ export class ReservationsService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  async listReservations() {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async listReservations(user: AuthenticatedUser) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const reservations = await this.prisma.reservation.findMany({
       where: { tenantId: tenant.id, restaurantId: restaurant.id },
       include: {
@@ -49,8 +50,8 @@ export class ReservationsService {
     }));
   }
 
-  async updateStatus(id: string, input: unknown) {
-    const { tenant, restaurant } = await this.tenantContext.getSingleTenantWorkspace();
+  async updateStatus(user: AuthenticatedUser, id: string, input: unknown) {
+    const { tenant, restaurant } = await this.tenantContext.getWorkspaceForTenant(user.tenantId);
     const body = UpdateStatusSchema.parse(input);
     const reservation = await this.prisma.reservation.findFirst({
       where: { id, tenantId: tenant.id, restaurantId: restaurant.id },

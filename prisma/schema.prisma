@@ -127,14 +127,14 @@ model User {
   id         String   @id @default(cuid())
   tenantId   String
   externalId String?  @unique
-  email      String
+  email      String   @unique
+  passwordHash String?
   name       String?
   role       UserRole @default(staff)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, email])
   @@index([tenantId])
 }
 

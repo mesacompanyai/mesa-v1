@@ -1,47 +1,51 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { AuthenticatedUser } from "../auth/auth.types";
+import { CurrentUser } from "../auth/current-user.decorator";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ConfigurationService } from "./configuration.service";
 
+@UseGuards(JwtAuthGuard)
 @Controller("configuration")
 export class ConfigurationController {
   constructor(private readonly configuration: ConfigurationService) {}
 
   @Get()
-  getConfiguration() {
-    return this.configuration.getConfiguration();
+  getConfiguration(@CurrentUser() user: AuthenticatedUser) {
+    return this.configuration.getConfiguration(user);
   }
 
   @Patch("restaurant")
-  updateRestaurant(@Body() body: unknown) {
-    return this.configuration.updateRestaurant(body);
+  updateRestaurant(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    return this.configuration.updateRestaurant(user, body);
   }
 
   @Post("tables")
-  createTable(@Body() body: unknown) {
-    return this.configuration.createTable(body);
+  createTable(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    return this.configuration.createTable(user, body);
   }
 
   @Patch("tables/:id")
-  updateTable(@Param("id") id: string, @Body() body: unknown) {
-    return this.configuration.updateTable(id, body);
+  updateTable(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.configuration.updateTable(user, id, body);
   }
 
   @Delete("tables/:id")
-  deleteTable(@Param("id") id: string) {
-    return this.configuration.deleteTable(id);
+  deleteTable(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.configuration.deleteTable(user, id);
   }
 
   @Post("team")
-  createTeamMember(@Body() body: unknown) {
-    return this.configuration.createTeamMember(body);
+  createTeamMember(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    return this.configuration.createTeamMember(user, body);
   }
 
   @Patch("team/:id")
-  updateTeamMember(@Param("id") id: string, @Body() body: unknown) {
-    return this.configuration.updateTeamMember(id, body);
+  updateTeamMember(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.configuration.updateTeamMember(user, id, body);
   }
 
   @Delete("team/:id")
-  deleteTeamMember(@Param("id") id: string) {
-    return this.configuration.deleteTeamMember(id);
+  deleteTeamMember(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.configuration.deleteTeamMember(user, id);
   }
 }

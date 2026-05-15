@@ -13,6 +13,46 @@ const CONVERSATION_RETENTION_DAYS = {
 };
 
 const MESA_API_BASE_URL = window.MESA_API_BASE_URL || "";
+const MESA_AUTH_STORAGE_KEY = "mesa.auth.v1";
+
+function readStoredAuthSession() {
+  try {
+    const raw = localStorage.getItem(MESA_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (session?.accessToken && session?.user?.email) return session;
+  } catch (error) {
+    console.warn("Could not read Mesa auth session.", error);
+  }
+
+  return null;
+}
+
+function persistAuthSession(session) {
+  try {
+    localStorage.setItem(MESA_AUTH_STORAGE_KEY, JSON.stringify(session));
+  } catch (error) {
+    console.warn("Could not persist Mesa auth session.", error);
+  }
+}
+
+function clearAuthSession() {
+  try {
+    localStorage.removeItem(MESA_AUTH_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Could not clear Mesa auth session.", error);
+  }
+}
+
+function getUserInitials(user) {
+  const source = user?.name || user?.email || "Mesa";
+  const words = source
+    .replace(/@.*/, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials = words.length > 1 ? `${words[0][0]}${words[1][0]}` : (words[0] || source).slice(0, 2);
+  return initials.toUpperCase();
+}
 
 function buildMockRestaurantConfig() {
   const r = window.MOCK_RESTAURANT || {};
@@ -115,19 +155,223 @@ function mergeRestaurantConfig(current, patch) {
 }
 
 async function mesaApi(path, options = {}) {
+  const { authToken, ...fetchOptions } = options;
+  const storedToken = readStoredAuthSession()?.accessToken;
+  const token = authToken === undefined ? storedToken : authToken;
   const response = await fetch(`${MESA_API_BASE_URL}/api${path}`, {
-    ...options,
+    ...fetchOptions,
     headers: {
       "Content-Type": "application/json",
-      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(fetchOptions.headers || {}),
     },
   });
 
   if (!response.ok) {
-    throw new Error(`Mesa API ${response.status}`);
+    let message = `Mesa API ${response.status}`;
+    try {
+      const payload = await response.clone().json();
+      if (Array.isArray(payload.message)) message = payload.message.join(", ");
+      else if (payload.message) message = payload.message;
+    } catch (error) {
+      // Keep the status-based fallback.
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return response.status === 204 ? null : response.json();
+}
+
+function AuthLoadingScreen() {
+  return (
+    <div className="auth-screen auth-screen-loading">
+      <div className="auth-brand-lockup">
+        <div className="topbar-brand-mark">M</div>
+        <span>Mesa</span>
+      </div>
+    </div>
+  );
+}
+
+function AuthScreen({ onAuthenticated }) {
+  const [mode, setMode] = useStateApp("login");
+  const [form, setForm] = useStateApp({
+    restaurantName: "",
+    name: "",
+    email: "",
+    password: "",
+  });
+  const [loading, setLoading] = useStateApp(false);
+  const [error, setError] = useStateApp("");
+  const isRegister = mode === "register";
+
+  const updateField = (field, value) => {
+    setForm(current => ({ ...current, [field]: value }));
+  };
+
+  const submitAuth = async (event) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const body = isRegister
+        ? {
+            restaurantName: form.restaurantName,
+            name: form.name || undefined,
+            email: form.email,
+            password: form.password,
+          }
+        : {
+            email: form.email,
+            password: form.password,
+          };
+      const session = await mesaApi(isRegister ? "/auth/register" : "/auth/login", {
+        method: "POST",
+        authToken: null,
+        body: JSON.stringify(body),
+      });
+
+      persistAuthSession(session);
+      onAuthenticated(session);
+    } catch (error) {
+      if (error.status === 409) {
+        setError("Este e-mail já está cadastrado.");
+      } else if (error.status === 401) {
+        setError("E-mail ou senha inválidos.");
+      } else if (error.status === 400) {
+        setError("Revise os campos e tente novamente.");
+      } else {
+        setError("Não foi possível entrar agora.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchMode = (nextMode) => {
+    setMode(nextMode);
+    setError("");
+  };
+
+  return (
+    <div className="auth-screen">
+      <section className="auth-shell">
+        <div className="auth-panel">
+          <div className="auth-brand-lockup">
+            <div className="topbar-brand-mark">M</div>
+            <span>Mesa</span>
+          </div>
+
+          <div className="auth-copy">
+            <h1>{isRegister ? "Crie sua operação" : "Entre na Mesa"}</h1>
+            <p>{isRegister ? "Configure o primeiro acesso do restaurante." : "Acesse reservas, conversas e ajustes do restaurante."}</p>
+          </div>
+
+          <div className="auth-tabs" role="tablist" aria-label="Acesso">
+            <button type="button" className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>
+              Entrar
+            </button>
+            <button type="button" className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>
+              Cadastrar
+            </button>
+          </div>
+
+          <form className="auth-form" onSubmit={submitAuth}>
+            {isRegister && (
+              <>
+                <label className="auth-field">
+                  <span>Restaurante</span>
+                  <input
+                    value={form.restaurantName}
+                    onChange={(event) => updateField("restaurantName", event.target.value)}
+                    required
+                    minLength={2}
+                    maxLength={120}
+                    autoComplete="organization"
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>Seu nome</span>
+                  <input
+                    value={form.name}
+                    onChange={(event) => updateField("name", event.target.value)}
+                    maxLength={120}
+                    autoComplete="name"
+                  />
+                </label>
+              </>
+            )}
+
+            <label className="auth-field">
+              <span>E-mail</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
+                required
+                maxLength={254}
+                autoComplete="email"
+              />
+            </label>
+
+            <label className="auth-field">
+              <span>Senha</span>
+              <input
+                type="password"
+                value={form.password}
+                onChange={(event) => updateField("password", event.target.value)}
+                required
+                minLength={isRegister ? 8 : 1}
+                maxLength={128}
+                autoComplete={isRegister ? "new-password" : "current-password"}
+              />
+            </label>
+
+            {error && <div className="auth-error">{error}</div>}
+
+            <button className="btn btn-primary auth-submit" type="submit" disabled={loading}>
+              {loading ? "Aguarde..." : isRegister ? "Criar conta" : "Entrar"}
+            </button>
+          </form>
+        </div>
+
+        <aside className="auth-preview" aria-hidden="true">
+          <div className="auth-preview-top">
+            <div>
+              <span>Hoje</span>
+              <strong>18 reservas</strong>
+            </div>
+            <div className="status-pill status-confirmada"><span className="dot" />Online</div>
+          </div>
+          <div className="auth-preview-list">
+            <div className="auth-preview-row">
+              <span>19:30</span>
+              <strong>Marina B.</strong>
+              <small>4 pessoas</small>
+            </div>
+            <div className="auth-preview-row">
+              <span>20:00</span>
+              <strong>Rafael S.</strong>
+              <small>2 pessoas</small>
+            </div>
+            <div className="auth-preview-row active">
+              <span>20:30</span>
+              <strong>Luiza C.</strong>
+              <small>Área externa</small>
+            </div>
+          </div>
+          <div className="auth-preview-message">
+            <Icon name="ai" size={15} />
+            <span>Recepcionista virtual acompanhando novas solicitações.</span>
+          </div>
+        </aside>
+      </section>
+    </div>
+  );
 }
 
 function normalizeTable(table, index) {
@@ -204,6 +448,8 @@ function App() {
     "showWhatsappAlert": false
   }/*EDITMODE-END*/);
 
+  const [authSession, setAuthSession] = useStateApp(() => readStoredAuthSession());
+  const [authReady, setAuthReady] = useStateApp(false);
   const [page, setPage] = useStateApp("reservas");
   const [wppConnected, setWppConnected] = useStateApp(true);
   const [restaurantConfig, setRestaurantConfig] = useStateApp(() => normalizeRestaurantConfig());
@@ -234,13 +480,64 @@ function App() {
     document.documentElement.setAttribute("data-theme", t.theme || "light");
   }, [t.theme]);
 
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuthSession(null);
+  };
+
+  const handleAuthenticated = (session) => {
+    setAuthSession(session);
+    setAuthReady(true);
+  };
+
+  const handleApiFailure = (error, fallbackMessage) => {
+    if (error?.status === 401) {
+      handleLogout();
+      return;
+    }
+
+    console.warn(fallbackMessage, error);
+  };
+
+  useEffectApp(() => {
+    const storedSession = readStoredAuthSession();
+    if (!storedSession?.accessToken) {
+      setAuthReady(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    mesaApi("/auth/me", { authToken: storedSession.accessToken })
+      .then((user) => {
+        if (cancelled) return;
+        const nextSession = { accessToken: storedSession.accessToken, user };
+        persistAuthSession(nextSession);
+        setAuthSession(nextSession);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.warn("Mesa session expired or could not be validated.", error);
+        clearAuthSession();
+        setAuthSession(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   React.useEffect(() => {
     deleteConversationsByIds(getExpiredConversationIds(conversations, conversationRetention));
   }, [conversations, conversationRetention]);
 
   useEffectApp(() => {
+    if (!authSession?.accessToken) return undefined;
+
     let cancelled = false;
-    mesaApi("/configuration")
+    mesaApi("/configuration", { authToken: authSession.accessToken })
       .then((configuration) => {
         if (cancelled) return;
         setRestaurantConfig(normalizeRestaurantConfig(configuration.restaurant));
@@ -248,12 +545,12 @@ function App() {
         setTeam((configuration.team || []).map(normalizeTeamMember));
       })
       .catch((error) => {
-        console.warn("Mesa API unavailable; using local mock state.", error);
+        handleApiFailure(error, "Mesa API unavailable; using local mock state.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authSession?.accessToken]);
 
   const saveRestaurantConfig = async (patch) => {
     setRestaurantConfig(current => mergeRestaurantConfig(current, patch));
@@ -264,7 +561,7 @@ function App() {
       });
       setRestaurantConfig(current => mergeRestaurantConfig(current, updated));
     } catch (error) {
-      console.warn("Could not persist restaurant configuration.", error);
+      handleApiFailure(error, "Could not persist restaurant configuration.");
     }
   };
 
@@ -284,7 +581,7 @@ function App() {
         });
         setTables(current => current.map(item => item.uid === temp.uid ? normalizeTable(saved, current.length) : item));
       } catch (error) {
-        console.warn("Could not persist table.", error);
+        handleApiFailure(error, "Could not persist table.");
       }
     },
     onUpdateTable: async (uid, nextTable) => {
@@ -297,7 +594,7 @@ function App() {
           body: JSON.stringify(nextTable),
         });
       } catch (error) {
-        console.warn("Could not persist table update.", error);
+        handleApiFailure(error, "Could not persist table update.");
       }
     },
     onDeleteTable: async (uid) => {
@@ -307,7 +604,7 @@ function App() {
       try {
         await mesaApi(`/configuration/tables/${encodeURIComponent(table.id)}`, { method: "DELETE" });
       } catch (error) {
-        console.warn("Could not delete table.", error);
+        handleApiFailure(error, "Could not delete table.");
       }
     },
   };
@@ -326,7 +623,7 @@ function App() {
         });
         setTeam(current => current.map(item => item.uid === temp.uid ? normalizeTeamMember(saved, current.length) : item));
       } catch (error) {
-        console.warn("Could not persist team member.", error);
+        handleApiFailure(error, "Could not persist team member.");
       }
     },
     onUpdateTeamMember: async (uid, nextMember) => {
@@ -339,7 +636,7 @@ function App() {
           body: JSON.stringify({ ...nextMember, phone: nextMember.phone }),
         });
       } catch (error) {
-        console.warn("Could not persist team member update.", error);
+        handleApiFailure(error, "Could not persist team member update.");
       }
     },
     onDeleteTeamMember: async (uid) => {
@@ -349,7 +646,7 @@ function App() {
       try {
         await mesaApi(`/configuration/team/${encodeURIComponent(member.id)}`, { method: "DELETE" });
       } catch (error) {
-        console.warn("Could not delete team member.", error);
+        handleApiFailure(error, "Could not delete team member.");
       }
     },
   };
@@ -359,6 +656,17 @@ function App() {
     { id: "conversas", label: "Conversas", icon: "chat" },
     { id: "geral",     label: "Geral",     icon: "gear" },
   ];
+  const currentUser = authSession?.user;
+  const currentRestaurantName = currentUser?.restaurantName || restaurantConfig.name || "Restaurante";
+  const currentUserLabel = currentUser?.name || currentUser?.email || "Conta";
+
+  if (!authReady) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!authSession?.accessToken) {
+    return <AuthScreen onAuthenticated={handleAuthenticated} />;
+  }
 
   return (
     <div className="mesa-app">
@@ -368,7 +676,7 @@ function App() {
             <div className="topbar-brand-mark">M</div>
             <span>Mesa</span>
             <span style={{ color: "var(--text-3)", fontWeight: 400, marginLeft: 4 }}>·</span>
-            <span style={{ color: "var(--text-3)", fontWeight: 400 }}>Casa Aurora</span>
+            <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{currentRestaurantName}</span>
           </div>
           <nav className="topbar-nav">
             {navItems.map(n => (
@@ -390,7 +698,11 @@ function App() {
             <span style={{ fontSize: 10.5, color: "var(--text-4)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px" }}>⌘K</span>
           </div>
           <button className="icon-btn" title="Notificações"><Icon name="bell" size={15} /></button>
-          <button className="avatar-btn">MB</button>
+          <div className="topbar-user" title={currentUserLabel}>
+            <button className="avatar-btn" type="button">{getUserInitials(currentUser)}</button>
+            <span>{currentUserLabel}</span>
+          </div>
+          <button className="btn btn-ghost btn-sm topbar-logout" type="button" onClick={handleLogout}>Sair</button>
         </div>
       </header>
 
